@@ -270,22 +270,17 @@ function Admin() {
 
     // Get waiting tickets
     useEffect(() => {
-        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'));
+        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'), orderBy('createdAt', 'asc'));
         const unsubscribe = onSnapshot(q, 
             (snapshot) => {
                 const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                tickets.sort((a, b) => {
-                    const timeA = a.createdAt?.seconds || 0;
-                    const timeB = b.createdAt?.seconds || 0;
-                    return timeA - timeB;
-                });
-
                 setWaitingTickets(tickets);
             },
             (error) => {
                 console.error("Fout bij ophalen van de wachtrij:", error);
-                alert(`Kon de wachtrij niet laden: ${error.message}`);
+                if (error.message.includes("indexes?")) {
+                    alert(`DATABASE FOUT: De vereiste database-index ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+                }
             }
         );
         return () => unsubscribe();
@@ -313,35 +308,34 @@ function Admin() {
         setIsProcessing(true);
         try {
             await runTransaction(db, async (transaction) => {
-                // This query no longer needs a composite index
                 const ticketsQuery = query(
                     collection(db, `artifacts/${appId}/public/data/tickets`), 
-                    where('status', '==', 'waiting')
+                    where('status', '==', 'waiting'),
+                    orderBy('createdAt', 'asc'), // This query requires a composite index
+                    limit(1)
                 );
                 const waitingTicketsSnapshot = await transaction.get(ticketsQuery);
 
                 if (waitingTicketsSnapshot.empty) {
                     throw new Error("No tickets in queue"); 
                 }
-
-                // Sort in code to find the oldest ticket reliably
-                const tickets = waitingTicketsSnapshot.docs.map(d => ({...d.data(), id: d.id}));
-                tickets.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
                 
-                const nextTicket = tickets[0];
-                if (!nextTicket || !nextTicket.id) {
-                    throw new Error("Could not determine the next ticket.");
-                }
+                const nextTicketDoc = waitingTicketsSnapshot.docs[0];
+                const ticketRef = nextTicketDoc.ref; // This is the robust way to get the reference
+                const nextTicketData = nextTicketDoc.data();
 
-                const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
                 const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
 
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
-                transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
+                transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicketData.ticketNumber, ticketId: nextTicketDoc.id });
             });
         } catch (e) {
             console.error("TRANSACTION FAILED: ", e);
-            if (e.message !== "No tickets in queue") {
+            if (e.message.includes("No tickets in queue")) {
+                // This is not an error, just info for the developer
+            } else if (e.message.includes("indexes?")) {
+                alert(`DATABASE FOUT: De vereiste database-index ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+            } else {
                 alert(`Fout bij oproepen: ${e.message}`);
             }
         } finally {
