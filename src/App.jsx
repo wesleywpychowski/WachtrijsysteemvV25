@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component ---
+// --- Main App Component (for local development with navigation) ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -620,4 +620,5 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App as default, Kiosk, Display, Admin, Archive };
+export default App;
+export { Kiosk, Display, Admin, Archive };
