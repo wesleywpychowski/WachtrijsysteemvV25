@@ -24,43 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component ---
-function App() {
-    useEffect(() => {
-        document.title = 'Wachtrij Systeem';
-    }, []);
-
-    return (
-        <BrowserRouter>
-            <div className="bg-gray-50 h-screen font-sans flex flex-col">
-                <nav className="bg-white shadow-md flex-shrink-0 z-10">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between h-16">
-                            <Link to="/" className="flex items-center">
-                                <Users className="h-8 w-8 text-[#d64e78]" />
-                                <span className="ml-3 font-bold text-2xl text-gray-800">Wachtrij Systeem</span>
-                            </Link>
-                            <div className="flex items-center space-x-2">
-                                <NavLink to="/" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Kiosk</NavLink>
-                                <NavLink to="/display" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Weergave</NavLink>
-                                <NavLink to="/admin" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Beheer</NavLink>
-                            </div>
-                        </div>
-                    </div>
-                </nav>
-                <main className="flex-1 overflow-y-auto">
-                    <Routes>
-                        <Route path="/" element={<Kiosk />} />
-                        <Route path="/display" element={<Display />} />
-                        <Route path="/admin" element={<Admin />} />
-                    </Routes>
-                </main>
-            </div>
-        </BrowserRouter>
-    );
-}
-
-// --- Kiosk Component (Home Page: /) ---
+// --- Page Components (No export here) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -98,7 +62,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+        <div className="bg-gray-50 flex flex-col items-center justify-center p-8 text-center h-full">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -124,7 +88,6 @@ function Kiosk() {
     );
 }
 
-// --- Display Component (Page: /display) ---
 function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
@@ -233,7 +196,6 @@ function Display() {
     );
 }
 
-// --- Admin Component (Page: /admin) ---
 function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
