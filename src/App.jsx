@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component (for local development with navigation) ---
+// --- Main App Component ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -62,7 +62,7 @@ function App() {
     );
 }
 
-// --- Kiosk Component (Single Page) ---
+// --- Kiosk Component (Home Page: /) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -231,7 +231,7 @@ function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(null); // Changed to store location name
     const [isSystemReady, setIsSystemReady] = useState(false);
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState(null);
@@ -312,7 +312,7 @@ function Admin() {
             alert("Interne fout: ongeldige selectie.");
             return;
         }
-        setIsProcessing(true);
+        setIsProcessing(location);
         setIsTicketModalOpen(false);
 
         try {
@@ -333,8 +333,38 @@ function Admin() {
             console.error("TRANSACTION FAILED: ", e);
             alert(`Fout bij oproepen: ${e.message}`);
         } finally {
-            setIsProcessing(false);
+            setIsProcessing(null);
             setSelectedLocation(null);
+        }
+    };
+
+    const putBackTicket = async (location) => {
+        if (!location || typeof location !== 'string') {
+            alert("Interne fout: ongeldige locatie.");
+            return;
+        }
+        setIsProcessing(location);
+        const ticketId = locationStates[location]?.ticketId;
+
+        if (!ticketId) {
+            alert("Interne fout: kon het ticket ID niet vinden om terug te plaatsen.");
+            setIsProcessing(null);
+            return;
+        }
+
+        const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, ticketId);
+        const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                transaction.set(locationRef, { status: 'available', ticketNumber: null, ticketId: null });
+                transaction.update(ticketRef, { status: 'waiting', location: null, calledAt: null });
+            });
+        } catch (e) {
+            console.error("PUT BACK FAILED: ", e);
+            alert(`Kon ticket niet terugplaatsen: ${e.message}`);
+        } finally {
+            setIsProcessing(null);
         }
     };
 
@@ -343,7 +373,7 @@ function Admin() {
             alert("Interne fout: ongeldige locatie.");
             return;
         }
-        setIsProcessing(true);
+        setIsProcessing(location);
         const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
         const ticketId = locationStates[location]?.ticketId;
 
@@ -359,7 +389,7 @@ function Admin() {
             console.error("FINISH FAILED: ", e);
             alert(`Kon status niet bijwerken: ${e.message}`);
         } finally {
-             setIsProcessing(false);
+             setIsProcessing(null);
         }
     };
     
@@ -393,10 +423,10 @@ function Admin() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
                 <div className="flex items-center space-x-4">
-                    <a href="https://wachtrijvv-archive.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                    <Link to="/archive" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
                         <ArchiveIcon className="w-5 h-5 mr-2" />
                         Bekijk Archief
-                    </a>
+                    </Link>
                     <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
                         <RefreshCw className="w-5 h-5 mr-2" />
                         Reset Systeem
@@ -437,10 +467,16 @@ function Admin() {
                                         {isBusy ? (
                                             <>
                                                 <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
-                                                <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                                                    {!isProcessing && 'Voltooien'}
-                                                </button>
+                                                <div className="flex space-x-2 mt-2">
+                                                    <button onClick={() => putBackTicket(loc)} disabled={isProcessing} className="w-full flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                        {isProcessing === loc ? <Loader2 className="w-5 h-5 animate-spin"/> : <Undo2 className="w-5 h-5 mr-2" />}
+                                                        {isProcessing !== loc && 'Terug'}
+                                                    </button>
+                                                    <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                        {isProcessing === loc ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                                                        {isProcessing !== loc && 'Voltooien'}
+                                                    </button>
+                                                </div>
                                             </>
                                         ) : (
                                             <>
@@ -519,7 +555,7 @@ function Archive() {
                         </tr>
                     </thead>
                     <tbody>
-                        {finishedTickets.map(ticket => (
+                        {filteredTickets.map(ticket => (
                             <tr key={ticket.id} className="border-b hover:bg-gray-50">
                                 <td className="p-3 font-bold text-lg"># {ticket.ticketNumber}</td>
                                 <td className="p-3 text-gray-700">{ticket.location}</td>
@@ -530,7 +566,7 @@ function Archive() {
                         ))}
                     </tbody>
                 </table>
-                 {finishedTickets.length === 0 && (
+                 {filteredTickets.length === 0 && (
                      <p className="text-center p-8 text-gray-500">Geen voltooide tickets gevonden.</p>
                  )}
             </div>
