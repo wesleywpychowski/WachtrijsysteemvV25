@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component ---
+// --- Main App Component (for local development with navigation) ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -44,6 +44,7 @@ function App() {
                                 <NavLink to="/" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Kiosk</NavLink>
                                 <NavLink to="/display" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Weergave</NavLink>
                                 <NavLink to="/admin" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Beheer</NavLink>
+                                <NavLink to="/archive" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Archief</NavLink>
                             </div>
                         </div>
                     </div>
@@ -53,6 +54,7 @@ function App() {
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
                         <Route path="/admin" element={<Admin />} />
+                        <Route path="/archive" element={<Archive />} />
                     </Routes>
                 </main>
             </div>
@@ -60,7 +62,7 @@ function App() {
     );
 }
 
-// --- Kiosk Component (Home Page: /) ---
+// --- Kiosk Component (Single Page) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -143,7 +145,7 @@ function Display() {
                 
                 setMostRecentTicket(currentTicket => {
                     if (!currentTicket || currentTicket.id !== newTicket.id) {
-                        setFlash(true); // Trigger flash animation
+                        setFlash(true);
                         return newTicket;
                     }
                     return currentTicket;
@@ -166,12 +168,11 @@ function Display() {
         if (flash) {
             const timer = setTimeout(() => {
                 setFlash(false);
-            }, 2000); // Animation duration
+            }, 2000); 
             return () => clearTimeout(timer);
         }
     }, [flash]);
 
-    // Listener for the status of all locations
     useEffect(() => {
         const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
         const q = query(locationsRef, where('status', '==', 'busy'));
@@ -401,7 +402,7 @@ function Admin() {
                 <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col" style={{maxHeight: 'calc(100vh - 12rem)'}}>
                     <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex-shrink-0">Wachtrij ({waitingTickets.length})</h2>
                     <div className="space-y-3 overflow-y-auto flex-grow">
-                        {waitingTickets.length > 0 ? waitingTickets.map((ticket, index) => (
+                        {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
                             <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
                                 <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
                                 <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
@@ -468,6 +469,69 @@ function Admin() {
         </div>
     );
 }
+
+// --- Archive Component (Single Page) ---
+function Archive() {
+    const [finishedTickets, setFinishedTickets] = useState([]);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    useEffect(() => {
+        document.title = 'Archief | Wachtrij Systeem';
+    }, []);
+
+    useEffect(() => {
+        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'finished'), orderBy('calledAt', 'desc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setFinishedTickets(tickets);
+        });
+        return () => unsubscribe();
+    }, []);
+    
+    const filteredTickets = finishedTickets.filter(ticket =>
+        ticket.ticketNumber.toString().includes(searchTerm) ||
+        (ticket.location && ticket.location.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    return (
+        <div className="p-4 sm:p-6 lg:p-8 h-full flex flex-col">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Archief</h1>
+            <input
+                type="text"
+                placeholder="Zoek op nummer of lokaal..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="mb-6 p-2 border border-gray-300 rounded-md"
+            />
+            <div className="flex-grow overflow-y-auto">
+                <table className="w-full text-left table-auto">
+                    <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th className="p-3 font-semibold text-gray-600">Volgnummer</th>
+                            <th className="p-3 font-semibold text-gray-600">Lokaal</th>
+                            <th className="p-3 font-semibold text-gray-600">Geholpen om</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredTickets.map(ticket => (
+                            <tr key={ticket.id} className="border-b hover:bg-gray-50">
+                                <td className="p-3 font-bold text-lg"># {ticket.ticketNumber}</td>
+                                <td className="p-3 text-gray-700">{ticket.location}</td>
+                                <td className="p-3 text-gray-500">
+                                    {ticket.calledAt ? new Date(ticket.calledAt.seconds * 1000).toLocaleString('nl-NL') : '-'}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                 {filteredTickets.length === 0 && (
+                     <p className="text-center p-8 text-gray-500">Geen voltooide tickets gevonden.</p>
+                 )}
+            </div>
+        </div>
+    );
+}
+
 
 // --- TicketSelectionModal Component ---
 function TicketSelectionModal({ isOpen, onClose, tickets, location, onSelectTicket }) {
@@ -552,4 +616,4 @@ style.innerHTML = `
 document.head.appendChild(style);
 
 export default App;
-export { Kiosk, Display, Admin };
+export { Kiosk, Display, Admin, Archive };
