@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2 } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 overflow-hidden">
+                <main className="flex-1 overflow-y-auto">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -98,7 +98,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center h-full overflow-y-auto">
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -189,9 +189,11 @@ function Display() {
         return () => unsubscribe();
     }, []);
 
+    const hasBusyLocations = busyLocations.length > 0;
+
     return (
         <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-            <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
+            <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl`}>
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
@@ -207,7 +209,7 @@ function Display() {
                 )}
             </div>
             
-            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg flex flex-col">
+            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg flex-col flex">
                 <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6 flex-shrink-0">Actieve Lokalen</h3>
                 <div className="overflow-y-auto flex-grow">
                     {busyLocations.length > 0 ? (
@@ -238,6 +240,8 @@ function Admin() {
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSystemReady, setIsSystemReady] = useState(false);
+    const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+    const [selectedLocation, setSelectedLocation] = useState(null);
 
     useEffect(() => {
         document.title = 'Beheer | Wachtrij Systeem';
@@ -305,24 +309,21 @@ function Admin() {
         return () => unsubscribe();
     }, []);
 
-    const callNextTicket = async (location) => {
-        if (!location || typeof location !== 'string') {
-            alert("Interne fout: ongeldige locatie.");
+    const handleOpenTicketModal = (location) => {
+        setSelectedLocation(location);
+        setIsTicketModalOpen(true);
+    };
+
+    const callSpecificTicket = async (location, ticket) => {
+        if (!location || !ticket || !ticket.id) {
+            alert("Interne fout: ongeldige selectie.");
             return;
         }
         setIsProcessing(true);
+        setIsTicketModalOpen(false);
 
         try {
-            if (waitingTickets.length === 0) {
-                 throw new Error("No tickets in queue");
-            }
-            const nextTicket = waitingTickets[0];
-            
-            if (!nextTicket || !nextTicket.id) {
-                throw new Error("Wachtrij data is onvolledig. Probeer de pagina te verversen.");
-            }
-
-            const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
+            const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, ticket.id);
             const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
 
             await runTransaction(db, async (transaction) => {
@@ -332,18 +333,15 @@ function Admin() {
                 }
 
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
-                transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
+                transaction.set(locationRef, { status: 'busy', ticketNumber: ticket.ticketNumber, ticketId: ticket.id });
             });
 
         } catch (e) {
             console.error("TRANSACTION FAILED: ", e);
-            if (e.message.includes("No tickets in queue")) {
-                // Not a user-facing error
-            } else {
-                alert(`Fout bij oproepen: ${e.message}`);
-            }
+            alert(`Fout bij oproepen: ${e.message}`);
         } finally {
             setIsProcessing(false);
+            setSelectedLocation(null);
         }
     };
 
@@ -411,7 +409,7 @@ function Admin() {
                 <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                     <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
                     <div className="space-y-3">
-                        {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
+                        {waitingTickets.length > 0 ? waitingTickets.map((ticket, index) => (
                             <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
                                 <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
                                 <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
@@ -449,9 +447,9 @@ function Admin() {
                                         ) : (
                                             <>
                                                 <p className="text-3xl font-black text-gray-400 my-2">-</p>
-                                                <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-[#d64e78] text-white font-semibold py-2 px-3 rounded-md hover:bg-[#c04169] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                <button onClick={() => handleOpenTicketModal(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-[#d64e78] text-white font-semibold py-2 px-3 rounded-md hover:bg-[#c04169] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
                                                      {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
-                                                    {!isProcessing && 'Volgende oproepen'}
+                                                    {!isProcessing && 'Kies een nummer'}
                                                 </button>
                                             </>
                                         )}
@@ -459,6 +457,56 @@ function Admin() {
                                 );
                             })}
                         </div>
+                    )}
+                </div>
+            </div>
+            <TicketSelectionModal
+                isOpen={isTicketModalOpen}
+                onClose={() => setIsTicketModalOpen(false)}
+                tickets={waitingTickets}
+                location={selectedLocation}
+                onSelectTicket={callSpecificTicket}
+            />
+            <ConfirmationModal
+                isOpen={isResetModalOpen}
+                onClose={() => setIsResetModalOpen(false)}
+                onConfirm={handleResetQueue}
+                title="Systeem Resetten"
+                message="Weet u zeker dat u de volledige wachtrij wilt verwijderen en alle lokalen wilt vrijgeven? Deze actie kan niet ongedaan worden gemaakt."
+            />
+        </div>
+    );
+}
+
+// --- TicketSelectionModal Component ---
+function TicketSelectionModal({ isOpen, onClose, tickets, location, onSelectTicket }) {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full flex flex-col" style={{maxHeight: '80vh'}}>
+                <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h2 className="text-xl font-bold text-gray-900">Kies een nummer voor {location}</h2>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200">
+                        <X className="w-6 h-6 text-gray-600" />
+                    </button>
+                </div>
+                <div className="overflow-y-auto">
+                    {tickets.length > 0 ? (
+                        <div className="space-y-2">
+                            {tickets.map(ticket => (
+                                <button
+                                    key={ticket.id}
+                                    onClick={() => onSelectTicket(location, ticket)}
+                                    className="w-full text-left p-4 rounded-lg bg-gray-50 hover:bg-[#d64e78] hover:text-white transition-colors flex justify-between items-center"
+                                >
+                                    <span className="text-2xl font-bold"># {ticket.ticketNumber}</span>
+                                    <span className="text-sm text-gray-500">{new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL')}</span>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-center text-gray-500 py-8">Geen nummers in de wachtrij.</p>
                     )}
                 </div>
             </div>
