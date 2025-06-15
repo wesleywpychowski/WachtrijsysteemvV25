@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -232,6 +232,7 @@ function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false); // State to disable buttons during a transaction
 
     // Get waiting tickets
     useEffect(() => {
@@ -256,28 +257,49 @@ function Admin() {
         return () => unsubscribe();
     }, []);
 
+    // ** REVISED FUNCTION **
     const callNextTicket = async (location) => {
-        const nextTicket = waitingTickets[0];
-        if (!nextTicket) {
-            alert("Er zijn geen wachtenden in de rij.");
-            return;
-        }
-
-        const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
-        const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
-
+        setIsProcessing(true); // Disable all buttons
         try {
             await runTransaction(db, async (transaction) => {
+                // Find the next ticket INSIDE the transaction for atomicity
+                const ticketsQuery = query(
+                    collection(db, `artifacts/${appId}/public/data/tickets`), 
+                    where('status', '==', 'waiting'), 
+                    orderBy('createdAt', 'asc'), 
+                    limit(1)
+                );
+                const waitingTicketsSnapshot = await transaction.get(ticketsQuery);
+
+                if (waitingTicketsSnapshot.empty) {
+                    throw new Error("No tickets in queue"); 
+                }
+
+                const nextTicketDoc = waitingTicketsSnapshot.docs[0];
+                const nextTicket = { id: nextTicketDoc.id, ...nextTicketDoc.data() };
+                
+                const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
+                const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+
+                // Perform updates
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
                 transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
             });
         } catch (e) {
-            console.error("Error calling ticket: ", e);
-            alert("Er is een fout opgetreden bij het oproepen van het nummer.");
+            if (e.message === "No tickets in queue") {
+                // This is not an error, just info.
+            } else {
+                console.error("Error calling ticket: ", e);
+                alert("Er is een fout opgetreden bij het oproepen van het nummer.");
+            }
+        } finally {
+            setIsProcessing(false); // Re-enable all buttons
         }
     };
 
+    // ** REVISED FUNCTION **
     const markAsFinished = async (location) => {
+        setIsProcessing(true); // Disable all buttons
         const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
         const ticketId = locationStates[location]?.ticketId;
 
@@ -292,6 +314,8 @@ function Admin() {
         } catch(e) {
             console.error("Error finishing ticket: ", e);
             alert("Kon de status niet bijwerken.");
+        } finally {
+             setIsProcessing(false); // Re-enable all buttons
         }
     };
     
@@ -361,17 +385,17 @@ function Admin() {
                                         {isBusy ? (
                                             <>
                                                 <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
-                                                <button onClick={() => markAsFinished(loc)} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors">
-                                                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                                                    Voltooien
+                                                <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                                                    {!isProcessing && 'Voltooien'}
                                                 </button>
                                             </>
                                         ) : (
                                             <>
                                                 <p className="text-3xl font-black text-gray-400 my-2">-</p>
-                                                <button onClick={() => callNextTicket(loc)} disabled={!canCall} className="w-full mt-2 flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                                    <Send className="w-5 h-5 mr-2" />
-                                                    Volgende oproepen
+                                                <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                     {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
+                                                    {!isProcessing && 'Volgende oproepen'}
                                                 </button>
                                             </>
                                         )}
