@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Volume2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component (for local development with navigation) ---
+// --- Main App Component ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-hidden">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -60,7 +60,7 @@ function App() {
     );
 }
 
-// --- Kiosk Component (Single Page) ---
+// --- Kiosk Component (Home Page: /) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -128,56 +128,59 @@ function Kiosk() {
 function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
-    const audioRef = useRef(null);
+    const audioSynth = useRef(null);
+    const [isAudioReady, setIsAudioReady] = useState(false);
 
     useEffect(() => {
         document.title = 'Weergave | Wachtrij Systeem';
+        if (window.Tone && window.Tone.context.state === 'running') {
+            setIsAudioReady(true);
+        }
     }, []);
 
-    useEffect(() => {
-        if (window.Tone) { audioRef.current = new window.Tone.Synth().toDestination(); } 
-        const startAudio = () => {
-            if (window.Tone && window.Tone.context.state !== 'running') { window.Tone.context.resume(); }
-            document.body.removeEventListener('click', startAudio);
-        };
-        document.body.addEventListener('click', startAudio);
-        return () => document.body.removeEventListener('click', startAudio);
-    }, []);
+    const initializeAudio = async () => {
+        if (window.Tone && window.Tone.context.state !== 'running') {
+            await window.Tone.start();
+            console.log("Audio Context is nu actief.");
+        }
+        if (!audioSynth.current && window.Tone) {
+            audioSynth.current = new window.Tone.Synth().toDestination();
+        }
+        setIsAudioReady(true);
+    };
 
     useEffect(() => {
+        if (!isAudioReady) return;
+
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         
-        const unsubscribe = onSnapshot(q, 
-            (snapshot) => { // Success callback
-                if (!snapshot.empty) {
-                    const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                    
-                    setMostRecentTicket(currentTicket => {
-                        if (!currentTicket || currentTicket.id !== newTicket.id) {
-                            if (audioRef.current && window.Tone && window.Tone.context.state === 'running') {
-                                const now = window.Tone.now();
-                                audioRef.current.triggerAttackRelease("C5", "8n", now);
-                                audioRef.current.triggerAttackRelease("G5", "8n", now + 0.2);
-                            }
-                            return newTicket;
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (!snapshot.empty) {
+                const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+                setMostRecentTicket(currentTicket => {
+                    if (!currentTicket || currentTicket.id !== newTicket.id) {
+                        if (audioSynth.current) {
+                            const now = window.Tone.now();
+                            audioSynth.current.triggerAttackRelease("C5", "8n", now);
+                            audioSynth.current.triggerAttackRelease("G5", "8n", now + 0.2);
                         }
-                        return currentTicket;
-                    });
-                } else {
-                    setMostRecentTicket(null);
-                }
-            }, 
-            (error) => { // Error callback to guide user
-                console.error("Fout bij ophalen van meest recente oproep:", error);
-                if (error.message.includes("indexes?")) {
-                    alert(`BELANGRIJKE DATABASE FOUT: De vereiste database-index voor het WEERGAVESCHERM ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
-                } else {
-                    alert(`Fout op weergavescherm: ${error.message}`);
-                }
+                        return newTicket;
+                    }
+                    return currentTicket;
+                });
+            } else {
+                setMostRecentTicket(null);
             }
-        );
+        }, (error) => {
+            console.error("Fout bij ophalen van meest recente oproep:", error);
+            if (error.message.includes("indexes?")) {
+                alert(`BELANGRIJKE DATABASE FOUT: De vereiste database-index voor het WEERGAVESCHERM ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+            } else {
+                alert(`Fout op weergavescherm: ${error.message}`);
+            }
+        });
         return () => unsubscribe();
-    }, []);
+    }, [isAudioReady]);
 
     // Listener for the status of all locations
     useEffect(() => {
@@ -192,7 +195,18 @@ function Display() {
     }, []);
 
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full relative">
+            {!isAudioReady && (
+                <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                    <button 
+                        onClick={initializeAudio}
+                        className="bg-[#d64e78] text-white font-bold py-6 px-10 rounded-lg text-2xl flex items-center gap-3 animate-pulse"
+                    >
+                        <Volume2 size={32} />
+                        Klik hier om geluid te activeren
+                    </button>
+                </div>
+            )}
             <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
@@ -552,5 +566,4 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export default App;
-export { Kiosk, Display, Admin };
+export { App as default, Kiosk, Display, Admin };
