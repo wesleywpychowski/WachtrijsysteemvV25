@@ -393,10 +393,10 @@ function Admin() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
                 <div className="flex items-center space-x-4">
-                    <Link to="/archive" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                    <a href="https://wachtrijvv-archive.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
                         <ArchiveIcon className="w-5 h-5 mr-2" />
                         Bekijk Archief
-                    </Link>
+                    </a>
                     <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
                         <RefreshCw className="w-5 h-5 mr-2" />
                         Reset Systeem
@@ -519,7 +519,7 @@ function Archive() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredTickets.map(ticket => (
+                        {finishedTickets.map(ticket => (
                             <tr key={ticket.id} className="border-b hover:bg-gray-50">
                                 <td className="p-3 font-bold text-lg"># {ticket.ticketNumber}</td>
                                 <td className="p-3 text-gray-700">{ticket.location}</td>
@@ -530,7 +530,7 @@ function Archive() {
                         ))}
                     </tbody>
                 </table>
-                 {filteredTickets.length === 0 && (
+                 {finishedTickets.length === 0 && (
                      <p className="text-center p-8 text-gray-500">Geen voltooide tickets gevonden.</p>
                  )}
             </div>
@@ -620,5 +620,4 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App, Kiosk, Display, Admin, Archive };
-export default App;
+export { App as default, Kiosk, Display, Admin, Archive };
