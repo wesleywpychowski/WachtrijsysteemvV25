@@ -189,11 +189,9 @@ function Display() {
         return () => unsubscribe();
     }, []);
 
-    const hasBusyLocations = busyLocations.length > 0;
-
     return (
         <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-            <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl`}>
+            <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
@@ -209,7 +207,7 @@ function Display() {
                 )}
             </div>
             
-            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg flex-col flex">
+            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg flex flex-col">
                 <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6 flex-shrink-0">Actieve Lokalen</h3>
                 <div className="overflow-y-auto flex-grow">
                     {busyLocations.length > 0 ? (
@@ -406,16 +404,15 @@ function Admin() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
-                    <div className="space-y-3">
+                <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col" style={{maxHeight: 'calc(100vh - 12rem)'}}>
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex-shrink-0">Wachtrij ({waitingTickets.length})</h2>
+                    <div className="space-y-3 overflow-y-auto flex-grow">
                         {waitingTickets.length > 0 ? waitingTickets.map((ticket, index) => (
                             <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
                                 <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
                                 <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
                             </div>
                         )) : <p className="text-center p-8 text-gray-500">De wachtrij is leeg.</p>}
-                         {waitingTickets.length > 5 && <p className="text-center text-sm text-gray-500 mt-4">... en {waitingTickets.length - 5} meer.</p>}
                     </div>
                 </div>
 
