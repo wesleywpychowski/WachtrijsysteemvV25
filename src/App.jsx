@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2 } from 'lucide-react';
 
@@ -232,7 +232,40 @@ function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false); // State to disable buttons during a transaction
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    // ** NEW: Initialization Effect **
+    useEffect(() => {
+        const initializeLocations = async () => {
+            const locationsCollectionRef = collection(db, `artifacts/${appId}/public/data/locations`);
+            const batch = writeBatch(db);
+            let writesMade = false;
+
+            for (const locationName of availableLocations) {
+                const locationDocRef = doc(locationsCollectionRef, locationName);
+                try {
+                    const docSnap = await getDoc(locationDocRef);
+                    if (!docSnap.exists()) {
+                        batch.set(locationDocRef, {
+                            status: 'available',
+                            ticketNumber: null,
+                            ticketId: null,
+                        });
+                        writesMade = true;
+                    }
+                } catch (error) {
+                    console.error("Error checking location document:", error);
+                }
+            }
+
+            if (writesMade) {
+                console.log("Initializing missing location documents...");
+                await batch.commit();
+            }
+        };
+
+        initializeLocations();
+    }, []); // Empty dependency array means it runs once on mount.
 
     // Get waiting tickets
     useEffect(() => {
@@ -257,12 +290,10 @@ function Admin() {
         return () => unsubscribe();
     }, []);
 
-    // ** REVISED FUNCTION **
     const callNextTicket = async (location) => {
-        setIsProcessing(true); // Disable all buttons
+        setIsProcessing(true);
         try {
             await runTransaction(db, async (transaction) => {
-                // Find the next ticket INSIDE the transaction for atomicity
                 const ticketsQuery = query(
                     collection(db, `artifacts/${appId}/public/data/tickets`), 
                     where('status', '==', 'waiting'), 
@@ -281,25 +312,21 @@ function Admin() {
                 const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
                 const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
 
-                // Perform updates
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
                 transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
             });
         } catch (e) {
-            if (e.message === "No tickets in queue") {
-                // This is not an error, just info.
-            } else {
+            if (e.message !== "No tickets in queue") {
                 console.error("Error calling ticket: ", e);
                 alert("Er is een fout opgetreden bij het oproepen van het nummer.");
             }
         } finally {
-            setIsProcessing(false); // Re-enable all buttons
+            setIsProcessing(false);
         }
     };
 
-    // ** REVISED FUNCTION **
     const markAsFinished = async (location) => {
-        setIsProcessing(true); // Disable all buttons
+        setIsProcessing(true);
         const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
         const ticketId = locationStates[location]?.ticketId;
 
@@ -315,7 +342,7 @@ function Admin() {
             console.error("Error finishing ticket: ", e);
             alert("Kon de status niet bijwerken.");
         } finally {
-             setIsProcessing(false); // Re-enable all buttons
+             setIsProcessing(false);
         }
     };
     
@@ -356,7 +383,6 @@ function Admin() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Waiting List Section */}
                     <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
                         <div className="space-y-3">
@@ -370,7 +396,6 @@ function Admin() {
                         </div>
                     </div>
 
-                    {/* Locations Status Section */}
                     <div className="md:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status Lokalen</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -426,6 +451,7 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message }) {
             <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full animate-fade-in">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">{title}</h2>
                 <p className="text-gray-600 mb-6">{message}</p>
+
                 <div className="flex justify-end space-x-4">
                     <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-semibold transition-colors">Annuleren</button>
                     <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold transition-colors">Bevestigen</button>
