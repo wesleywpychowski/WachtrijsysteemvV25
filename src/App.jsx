@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 overflow-hidden">
+                <main className="flex-1 overflow-y-auto">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -98,7 +98,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center h-full overflow-y-auto">
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -552,6 +552,4 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// ** NEW EXPORTS FOR main.jsx **
 export default App;
-export { Kiosk, Display, Admin };
