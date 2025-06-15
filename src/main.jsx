@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App, { Kiosk, Display, Admin } from './App.jsx'
+import App, { Kiosk, Display, Admin, Archive } from './App.jsx'
 import './index.css'
 
 // Lees de omgevingsvariabele die we in Netlify instellen
@@ -8,17 +8,15 @@ const appMode = import.meta.env.VITE_APP_MODE;
 
 let ComponentToRender;
 
-// Deze 'Wrapper' component zorgt ervoor dat de losse pagina's (Kiosk, Display, Admin)
-// altijd de volledige schermhoogte innemen, door de layout van de hoofd-app exact na te bootsen.
-// Dit lost het probleem met de witte ruimte op Netlify definitief op.
+// Deze 'Wrapper' component zorgt ervoor dat de losse pagina's
+// altijd de volledige schermhoogte innemen.
 const PageWrapper = ({ children }) => (
     <div className="h-screen font-sans flex flex-col">
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
             {children}
         </main>
     </div>
 );
-
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
 switch (appMode) {
@@ -30,6 +28,9 @@ switch (appMode) {
     break;
   case 'admin':
     ComponentToRender = <PageWrapper><Admin /></PageWrapper>;
+    break;
+  case 'archive':
+    ComponentToRender = <PageWrapper><Archive /></PageWrapper>;
     break;
   default:
     // Standaard tonen we de volledige app met navigatie (voor lokale ontwikkeling)
