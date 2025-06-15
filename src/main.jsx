@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App, { Kiosk, Display, Admin, Archive } from './App.jsx'
+import { BrowserRouter } from 'react-router-dom';
 import './index.css'
 
 // Lees de omgevingsvariabele die we in Netlify instellen
@@ -9,19 +10,18 @@ const appMode = import.meta.env.VITE_APP_MODE;
 let ComponentToRender;
 
 // Deze 'Wrapper' component zorgt ervoor dat de losse pagina's
-// altijd de volledige schermhoogte innemen en voorziet de benodigde router-context.
+// altijd de volledige schermhoogte innemen.
 const PageWrapper = ({ children }) => (
-    <BrowserRouter>
-        <div className="h-screen font-sans flex flex-col">
-            <main className="flex-1 overflow-y-auto">
-                {children}
-            </main>
-        </div>
-    </BrowserRouter>
+    <div className="h-screen font-sans flex flex-col">
+        <main className="flex-1 overflow-hidden">
+            {children}
+        </main>
+    </div>
 );
 
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
+// De BrowserRouter is nu toegevoegd om de 'basename' fout op te lossen.
 switch (appMode) {
   case 'kiosk':
     ComponentToRender = <PageWrapper><Kiosk /></PageWrapper>;
@@ -30,10 +30,10 @@ switch (appMode) {
     ComponentToRender = <PageWrapper><Display /></PageWrapper>;
     break;
   case 'admin':
-    ComponentToRender = <PageWrapper><Admin /></PageWrapper>;
+    ComponentToRender = <BrowserRouter><PageWrapper><Admin /></PageWrapper></BrowserRouter>;
     break;
   case 'archive':
-      ComponentToRender = <PageWrapper><Archive /></PageWrapper>;
+      ComponentToRender = <BrowserRouter><PageWrapper><Archive /></PageWrapper></BrowserRouter>;
       break;
   default:
     // Standaard tonen we de volledige app met navigatie (voor lokale ontwikkeling)
