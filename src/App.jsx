@@ -83,6 +83,7 @@ export default function App() {
 }
 
 // --- Kiosk Component (Home Page: /) ---
+// ** REVISED for data integrity **
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -93,23 +94,27 @@ function Kiosk() {
         setError('');
         setTicketNumber(null);
 
-        const counterRef = doc(db, `artifacts/${appId}/public/data/counters`, 'ticketCounter');
-        const ticketsCollectionRef = collection(db, `artifacts/${appId}/public/data/tickets`);
-
         try {
             const newTicketNumber = await runTransaction(db, async (transaction) => {
+                const counterRef = doc(db, `artifacts/${appId}/public/data/counters`, 'ticketCounter');
                 const counterDoc = await transaction.get(counterRef);
                 let currentNumber = 0; 
                 if (counterDoc.exists()) { currentNumber = counterDoc.data().lastNumber; }
                 const newNumber = currentNumber + 1;
+                
+                // Correctly create a new document reference within the transaction
+                const newTicketRef = doc(collection(db, `artifacts/${appId}/public/data/tickets`));
+
+                // Atomically update the counter and create the new ticket
                 transaction.set(counterRef, { lastNumber: newNumber }, { merge: true });
-                await addDoc(ticketsCollectionRef, { ticketNumber: newNumber, status: 'waiting', createdAt: serverTimestamp(), location: null, calledAt: null });
+                transaction.set(newTicketRef, { ticketNumber: newNumber, status: 'waiting', createdAt: serverTimestamp(), location: null, calledAt: null });
+                
                 return newNumber;
             });
             setTicketNumber(newTicketNumber);
         } catch (e) {
             console.error("Error getting ticket: ", e);
-            setError("Kon geen nummer ophalen. Probeer het opnieuw.");
+            setError(`Kon geen nummer ophalen. Fout: ${e.message}`);
         } finally { setIsLoading(false); }
     };
 
@@ -233,9 +238,8 @@ function Admin() {
     const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isSystemReady, setIsSystemReady] = useState(false); // ** NEW **
+    const [isSystemReady, setIsSystemReady] = useState(false);
 
-    // ** REVISED: Initialization Effect **
     useEffect(() => {
         const initializeSystem = async () => {
             console.log("Checking system initialization...");
@@ -261,7 +265,7 @@ function Admin() {
                 await batch.commit();
             }
             console.log("System is ready.");
-            setIsSystemReady(true); // ** NEW **
+            setIsSystemReady(true);
         };
 
         initializeSystem();
@@ -291,6 +295,10 @@ function Admin() {
     }, []);
 
     const callNextTicket = async (location) => {
+        if (!location || typeof location !== 'string') {
+            alert("Interne fout: ongeldige locatie.");
+            return;
+        }
         setIsProcessing(true);
         try {
             await runTransaction(db, async (transaction) => {
@@ -316,7 +324,6 @@ function Admin() {
                 transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
             });
         } catch (e) {
-            // ** REVISED: Detailed error logging **
             console.error("TRANSACTION FAILED: ", e);
             if (e.message !== "No tickets in queue") {
                 alert(`Fout bij oproepen: ${e.message}`);
@@ -327,6 +334,10 @@ function Admin() {
     };
 
     const markAsFinished = async (location) => {
+        if (!location || typeof location !== 'string') {
+            alert("Interne fout: ongeldige locatie.");
+            return;
+        }
         setIsProcessing(true);
         const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
         const ticketId = locationStates[location]?.ticketId;
@@ -340,7 +351,6 @@ function Admin() {
                 }
             });
         } catch(e) {
-            // ** REVISED: Detailed error logging **
             console.error("FINISH FAILED: ", e);
             alert(`Kon status niet bijwerken: ${e.message}`);
         } finally {
@@ -400,7 +410,6 @@ function Admin() {
 
                     <div className="md:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status Lokalen</h2>
-                        {/* ** NEW: System ready check ** */}
                         {!isSystemReady ? (
                              <div className="flex items-center justify-center h-48">
                                 <Loader2 className="w-8 h-8 animate-spin text-gray-400"/>
