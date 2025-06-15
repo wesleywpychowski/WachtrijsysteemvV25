@@ -33,7 +33,7 @@ function App() {
     return (
         <BrowserRouter>
             <div className="bg-gray-50 h-screen font-sans flex flex-col">
-                <nav className="bg-white shadow-md">
+                <nav className="bg-white shadow-md flex-shrink-0">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
                             <Link to="/" className="flex items-center">
@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-hidden">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -98,7 +98,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full overflow-y-auto">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -207,7 +207,7 @@ function Display() {
                 )}
             </div>
             
-            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg">
+            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg overflow-y-auto">
                 <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6">Actieve Lokalen</h3>
                 {busyLocations.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
@@ -396,7 +396,7 @@ function Admin() {
     };
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 h-full">
+        <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
                 <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
@@ -467,7 +467,7 @@ function Admin() {
                 title="Systeem Resetten"
                 message="Weet u zeker dat u de volledige wachtrij wilt verwijderen en alle lokalen wilt vrijgeven? Deze actie kan niet ongedaan worden gemaakt."
             />
-        </>
+        </div>
     );
 }
 
