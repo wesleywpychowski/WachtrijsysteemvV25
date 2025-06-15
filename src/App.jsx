@@ -411,8 +411,8 @@ function Admin() {
                         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
                         <div className="space-y-3">
                             {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
-                                <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-blue-100 border-blue-400 border-2' : 'bg-gray-100'}`}>
-                                    <span className={`font-bold text-2xl ${index === 0 ? 'text-blue-600' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
+                                <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
+                                    <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
                                     <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
                                 </div>
                             )) : <p className="text-center p-8 text-gray-500">De wachtrij is leeg.</p>}
@@ -448,7 +448,7 @@ function Admin() {
                                             ) : (
                                                 <>
                                                     <p className="text-3xl font-black text-gray-400 my-2">-</p>
-                                                    <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-[#d64e78] text-white font-semibold py-2 px-3 rounded-md hover:bg-[#c04169] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
                                                          {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
                                                         {!isProcessing && 'Volgende oproepen'}
                                                     </button>
