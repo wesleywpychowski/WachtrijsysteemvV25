@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 overflow-hidden">
+                <main className="flex-1 overflow-y-auto">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -130,12 +130,10 @@ function Display() {
     const [busyLocations, setBusyLocations] = useState([]);
     const audioSynth = useRef(null);
     const [isAudioReady, setIsAudioReady] = useState(false);
+    const lastPlayedTicketId = useRef(null);
 
     useEffect(() => {
         document.title = 'Weergave | Wachtrij Systeem';
-        if (window.Tone && window.Tone.context.state === 'running') {
-            setIsAudioReady(true);
-        }
     }, []);
 
     const initializeAudio = async () => {
@@ -150,24 +148,12 @@ function Display() {
     };
 
     useEffect(() => {
-        if (!isAudioReady) return;
-
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
             if (!snapshot.empty) {
                 const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                setMostRecentTicket(currentTicket => {
-                    if (!currentTicket || currentTicket.id !== newTicket.id) {
-                        if (audioSynth.current) {
-                            const now = window.Tone.now();
-                            audioSynth.current.triggerAttackRelease("C5", "8n", now);
-                            audioSynth.current.triggerAttackRelease("G5", "8n", now + 0.2);
-                        }
-                        return newTicket;
-                    }
-                    return currentTicket;
-                });
+                setMostRecentTicket(newTicket);
             } else {
                 setMostRecentTicket(null);
             }
@@ -180,7 +166,18 @@ function Display() {
             }
         });
         return () => unsubscribe();
-    }, [isAudioReady]);
+    }, []);
+
+    useEffect(() => {
+        if (isAudioReady && mostRecentTicket && mostRecentTicket.id !== lastPlayedTicketId.current) {
+            if (audioSynth.current && window.Tone && window.Tone.context.state === 'running') {
+                const now = window.Tone.now();
+                audioSynth.current.triggerAttackRelease("C5", "8n", now);
+                audioSynth.current.triggerAttackRelease("G5", "8n", now + 0.2);
+                lastPlayedTicketId.current = mostRecentTicket.id;
+            }
+        }
+    }, [mostRecentTicket, isAudioReady]);
 
     // Listener for the status of all locations
     useEffect(() => {
@@ -566,4 +563,6 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App as default, Kiosk, Display, Admin };
+// This is the correct way to export for the main.jsx file
+export { App, Kiosk, Display, Admin };
+export default App;
