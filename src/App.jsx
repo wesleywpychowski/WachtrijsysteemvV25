@@ -158,31 +158,39 @@ function Display() {
         return () => document.body.removeEventListener('click', startAudio);
     }, []);
 
-    // ** REVISED: Listener for the most recent call **
+    // ** DEFINITIVE FIX for Display Screen **
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            if (!snapshot.empty) {
-                const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                
-                // Use functional update to compare with the latest state
-                setMostRecentTicket(currentTicket => {
-                    if (!currentTicket || currentTicket.id !== newTicket.id) {
-                        // Play sound only if it's a genuinely new ticket
-                        if (audioRef.current && window.Tone.context.state === 'running') {
-                            audioRef.current.triggerAttackRelease("C5", "8n");
+        const unsubscribe = onSnapshot(q, 
+            (snapshot) => { // Success callback
+                if (!snapshot.empty) {
+                    const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+                    
+                    setMostRecentTicket(currentTicket => {
+                        if (!currentTicket || currentTicket.id !== newTicket.id) {
+                            if (audioRef.current && window.Tone.context.state === 'running') {
+                                audioRef.current.triggerAttackRelease("C5", "8n");
+                            }
+                            return newTicket;
                         }
-                        return newTicket;
-                    }
-                    return currentTicket; // No change
-                });
-            } else {
-                setMostRecentTicket(null);
+                        return currentTicket;
+                    });
+                } else {
+                    setMostRecentTicket(null);
+                }
+            }, 
+            (error) => { // Error callback to guide user
+                console.error("Fout bij ophalen van meest recente oproep:", error);
+                if (error.message.includes("indexes?")) {
+                    alert(`BELANGRIJKE DATABASE FOUT: De vereiste database-index voor het WEERGAVESCHERM ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+                } else {
+                    alert(`Fout op weergavescherm: ${error.message}`);
+                }
             }
-        });
+        );
         return () => unsubscribe();
-    }, []); // Empty dependency array: runs only once, listener persists.
+    }, []);
 
     // Listener for the status of all locations
     useEffect(() => {
@@ -286,7 +294,7 @@ function Admin() {
             (error) => {
                 console.error("Fout bij ophalen van de wachtrij:", error);
                 if (error.message.includes("indexes?")) {
-                    alert(`DATABASE FOUT: De vereiste database-index ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+                    alert(`DATABASE FOUT: De vereiste database-index voor de BEHEER-pagina ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
                 }
             }
         );
