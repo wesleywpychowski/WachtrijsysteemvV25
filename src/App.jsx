@@ -158,24 +158,31 @@ function Display() {
         return () => document.body.removeEventListener('click', startAudio);
     }, []);
 
-    // Listener for the most recent call
+    // ** REVISED: Listener for the most recent call **
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
+        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             if (!snapshot.empty) {
                 const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                if (!mostRecentTicket || mostRecentTicket.id !== newTicket.id) {
-                    setMostRecentTicket(newTicket);
-                    if (audioRef.current && window.Tone.context.state === 'running') {
-                        audioRef.current.triggerAttackRelease("C5", "8n");
+                
+                // Use functional update to compare with the latest state
+                setMostRecentTicket(currentTicket => {
+                    if (!currentTicket || currentTicket.id !== newTicket.id) {
+                        // Play sound only if it's a genuinely new ticket
+                        if (audioRef.current && window.Tone.context.state === 'running') {
+                            audioRef.current.triggerAttackRelease("C5", "8n");
+                        }
+                        return newTicket;
                     }
-                }
+                    return currentTicket; // No change
+                });
             } else {
                 setMostRecentTicket(null);
             }
         });
         return () => unsubscribe();
-    }, [mostRecentTicket]);
+    }, []); // Empty dependency array: runs only once, listener persists.
 
     // Listener for the status of all locations
     useEffect(() => {
@@ -300,7 +307,6 @@ function Admin() {
     }, []);
 
     const callNextTicket = async (location) => {
-        // This function is now much more robust against race conditions and missing data.
         if (!location || typeof location !== 'string') {
             alert("Interne fout: ongeldige locatie.");
             return;
@@ -308,8 +314,6 @@ function Admin() {
         setIsProcessing(true);
 
         try {
-            // We use the already-fetched `waitingTickets` state.
-            // This is safer than re-querying inside a transaction without a perfect index.
             if (waitingTickets.length === 0) {
                  throw new Error("No tickets in queue");
             }
@@ -322,10 +326,8 @@ function Admin() {
             const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
             const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
 
-            // The transaction now only performs the write operations.
             await runTransaction(db, async (transaction) => {
                 const ticketDoc = await transaction.get(ticketRef);
-                // Ensure the ticket is still 'waiting' before proceeding.
                 if (!ticketDoc.exists() || ticketDoc.data().status !== 'waiting') {
                     throw new Error("Ticket is al opgeroepen door een andere gebruiker.");
                 }
