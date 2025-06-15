@@ -102,7 +102,7 @@ function Kiosk() {
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
-                        <img src="https://methodeschoolvanveldeke.be/wp-content/uploads/2023/02/Poster-vv2-2048x1448.jpg" alt="Logo Wachtrijsysteem" className="mx-auto h-24 w-auto mb-6 object-contain" />
+                        <img src="https://methodeschoolvanveldeke.be/wp-content/uploads/2023/02/Poster-vv2-2048x1448.jpg" alt="Logo Wachtrijsysteem" className="mx-auto h-48 w-auto mb-6 object-contain" />
                         <h1 className="text-4xl md:text-5xl font-bold text-gray-800">Welkom!</h1>
                         <p className="mt-4 text-lg text-gray-600">Druk op de knop om een volgnummer te ontvangen.</p>
                         <button onClick={getTicket} disabled={isLoading} className="mt-10 w-full bg-[#d64e78] text-white font-bold py-6 px-8 rounded-xl text-2xl hover:bg-[#c04169] focus:outline-none focus:ring-4 focus:ring-pink-300 transition-all duration-300 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center">
