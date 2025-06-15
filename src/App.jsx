@@ -299,42 +299,45 @@ function Admin() {
         return () => unsubscribe();
     }, []);
 
-    // ** DEFINITIVE FIX for calling next ticket **
     const callNextTicket = async (location) => {
+        // This function is now much more robust against race conditions and missing data.
         if (!location || typeof location !== 'string') {
             alert("Interne fout: ongeldige locatie.");
             return;
         }
         setIsProcessing(true);
+
         try {
+            // We use the already-fetched `waitingTickets` state.
+            // This is safer than re-querying inside a transaction without a perfect index.
+            if (waitingTickets.length === 0) {
+                 throw new Error("No tickets in queue");
+            }
+            const nextTicket = waitingTickets[0];
+            
+            if (!nextTicket || !nextTicket.id) {
+                throw new Error("Wachtrij data is onvolledig. Probeer de pagina te verversen.");
+            }
+
+            const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
+            const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+
+            // The transaction now only performs the write operations.
             await runTransaction(db, async (transaction) => {
-                const ticketsQuery = query(
-                    collection(db, `artifacts/${appId}/public/data/tickets`), 
-                    where('status', '==', 'waiting'),
-                    orderBy('createdAt', 'asc'), // This query requires a composite index
-                    limit(1)
-                );
-                const waitingTicketsSnapshot = await transaction.get(ticketsQuery);
-
-                if (waitingTicketsSnapshot.empty) {
-                    throw new Error("No tickets in queue"); 
+                const ticketDoc = await transaction.get(ticketRef);
+                // Ensure the ticket is still 'waiting' before proceeding.
+                if (!ticketDoc.exists() || ticketDoc.data().status !== 'waiting') {
+                    throw new Error("Ticket is al opgeroepen door een andere gebruiker.");
                 }
-                
-                const nextTicketDoc = waitingTicketsSnapshot.docs[0];
-                const ticketRef = nextTicketDoc.ref; // This is the robust way to get the reference
-                const nextTicketData = nextTicketDoc.data();
-
-                const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
 
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
-                transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicketData.ticketNumber, ticketId: nextTicketDoc.id });
+                transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
             });
+
         } catch (e) {
             console.error("TRANSACTION FAILED: ", e);
             if (e.message.includes("No tickets in queue")) {
-                // This is not an error, just info for the developer
-            } else if (e.message.includes("indexes?")) {
-                alert(`DATABASE FOUT: De vereiste database-index ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+                // Not a user-facing error
             } else {
                 alert(`Fout bij oproepen: ${e.message}`);
             }
