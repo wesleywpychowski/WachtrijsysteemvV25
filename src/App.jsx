@@ -189,11 +189,9 @@ function Display() {
         return () => unsubscribe();
     }, []);
 
-    const hasBusyLocations = busyLocations.length > 0;
-
     return (
         <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-            <div className={`rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl bg-[#d64e78] ${hasBusyLocations ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+            <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
@@ -209,7 +207,7 @@ function Display() {
                 )}
             </div>
             
-            <div className={`bg-gray-700 rounded-2xl p-6 shadow-lg flex-col ${hasBusyLocations ? 'flex' : 'hidden lg:flex'}`}>
+            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg flex flex-col">
                 <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6 flex-shrink-0">Actieve Lokalen</h3>
                 <div className="overflow-y-auto flex-grow">
                     {busyLocations.length > 0 ? (
