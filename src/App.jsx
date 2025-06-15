@@ -25,33 +25,7 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
 // --- Main App Component ---
-export default function App() {
-    const [isAuthReady, setIsAuthReady] = useState(false);
-
-    useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(user => {
-            if (user) {
-                setIsAuthReady(true);
-            } else {
-                signInAnonymously(auth).catch(error => {
-                    console.error("Anonymous sign-in failed:", error);
-                });
-            }
-        });
-        return () => unsubscribe();
-    }, []);
-
-    if (!isAuthReady) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-gray-100">
-                <div className="text-center">
-                    <p className="text-xl font-semibold text-gray-700">Authenticatie wordt geladen...</p>
-                    <div className="mt-4 w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                </div>
-            </div>
-        );
-    }
-    
+function App() {
     return (
         <BrowserRouter>
             <div className="bg-gray-50 min-h-screen font-sans">
@@ -521,4 +495,7 @@ style.innerHTML = `
   }
 `;
 document.head.appendChild(style);
+
+// ** NEW EXPORTS FOR main.jsx **
+export default App;
 export { Kiosk, Display, Admin };
