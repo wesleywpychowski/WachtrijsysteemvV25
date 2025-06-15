@@ -402,7 +402,7 @@ function Admin() {
                 <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col" style={{maxHeight: 'calc(100vh - 12rem)'}}>
                     <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex-shrink-0">Wachtrij ({waitingTickets.length})</h2>
                     <div className="space-y-3 overflow-y-auto flex-grow">
-                        {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
+                        {waitingTickets.length > 0 ? waitingTickets.map((ticket, index) => (
                             <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
                                 <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
                                 <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
@@ -531,7 +531,6 @@ function Archive() {
         </div>
     );
 }
-
 
 // --- TicketSelectionModal Component ---
 function TicketSelectionModal({ isOpen, onClose, tickets, location, onSelectTicket }) {
