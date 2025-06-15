@@ -12,12 +12,11 @@ let ComponentToRender;
 // altijd de volledige schermhoogte innemen.
 const PageWrapper = ({ children }) => (
     <div className="h-screen font-sans flex flex-col">
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-hidden">
             {children}
         </main>
     </div>
 );
-
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
 switch (appMode) {

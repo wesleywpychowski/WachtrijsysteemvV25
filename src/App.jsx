@@ -620,4 +620,5 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App as default, Kiosk, Display, Admin, Archive };
+export default App;
+export { Kiosk, Display, Admin, Archive };
