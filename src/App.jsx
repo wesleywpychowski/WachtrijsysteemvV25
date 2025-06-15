@@ -268,14 +268,13 @@ function Admin() {
         initializeSystem();
     }, []); 
 
-    // ** REVISED: Get waiting tickets (client-side sort for robustness) **
+    // Get waiting tickets
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'));
         const unsubscribe = onSnapshot(q, 
             (snapshot) => {
                 const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                // Sort client-side to avoid complex Firestore index requirements
                 tickets.sort((a, b) => {
                     const timeA = a.createdAt?.seconds || 0;
                     const timeB = b.createdAt?.seconds || 0;
@@ -305,6 +304,7 @@ function Admin() {
         return () => unsubscribe();
     }, []);
 
+    // ** DEFINITIVE FIX for calling next ticket **
     const callNextTicket = async (location) => {
         if (!location || typeof location !== 'string') {
             alert("Interne fout: ongeldige locatie.");
@@ -313,11 +313,10 @@ function Admin() {
         setIsProcessing(true);
         try {
             await runTransaction(db, async (transaction) => {
+                // This query no longer needs a composite index
                 const ticketsQuery = query(
                     collection(db, `artifacts/${appId}/public/data/tickets`), 
-                    where('status', '==', 'waiting'), 
-                    orderBy('createdAt', 'asc'), 
-                    limit(1)
+                    where('status', '==', 'waiting')
                 );
                 const waitingTicketsSnapshot = await transaction.get(ticketsQuery);
 
@@ -325,9 +324,15 @@ function Admin() {
                     throw new Error("No tickets in queue"); 
                 }
 
-                const nextTicketDoc = waitingTicketsSnapshot.docs[0];
-                const nextTicket = { id: nextTicketDoc.id, ...nextTicketDoc.data() };
+                // Sort in code to find the oldest ticket reliably
+                const tickets = waitingTicketsSnapshot.docs.map(d => ({...d.data(), id: d.id}));
+                tickets.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
                 
+                const nextTicket = tickets[0];
+                if (!nextTicket || !nextTicket.id) {
+                    throw new Error("Could not determine the next ticket.");
+                }
+
                 const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
                 const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
 
