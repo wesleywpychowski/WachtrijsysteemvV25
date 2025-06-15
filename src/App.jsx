@@ -189,11 +189,9 @@ function Display() {
         return () => unsubscribe();
     }, []);
 
-    const hasBusyLocations = busyLocations.length > 0;
-
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-            <div className={`rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl bg-[#d64e78] ${hasBusyLocations ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+        <div className="bg-rgb(31,41,55) text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+            <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
@@ -209,9 +207,9 @@ function Display() {
                 )}
             </div>
             
-            {hasBusyLocations && (
-                <div className="bg-gray-700 rounded-2xl p-6 shadow-lg overflow-y-auto">
-                    <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6">Actieve Lokalen</h3>
+            <div className="bg-rgb(31,41,55) rounded-2xl p-6 shadow-lg">
+                <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6">Actieve Lokalen</h3>
+                {busyLocations.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
                         {busyLocations.map(loc => (
                             <div key={loc.name} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center animate-slide-in">
@@ -220,8 +218,13 @@ function Display() {
                             </div>
                         ))}
                     </div>
-                </div>
-            )}
+                ) : (
+                    <div className="text-center text-gray-400 pt-8">
+                        <Building2 className="mx-auto h-16 w-16 mb-4"/>
+                        <span>Geen lokalen bezet</span>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
