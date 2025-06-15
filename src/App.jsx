@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component (for local development with navigation) ---
+// --- Main App Component ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -392,10 +392,16 @@ function Admin() {
         <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
-                <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
-                    <RefreshCw className="w-5 h-5 mr-2" />
-                    Reset Systeem
-                </button>
+                <div className="flex items-center space-x-4">
+                    <Link to="/archive" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                        <ArchiveIcon className="w-5 h-5 mr-2" />
+                        Bekijk Archief
+                    </Link>
+                    <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
+                        <RefreshCw className="w-5 h-5 mr-2" />
+                        Reset Systeem
+                    </button>
+                </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -614,5 +620,4 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export default App;
-export { Kiosk, Display, Admin, Archive };
+export { App as default, Kiosk, Display, Admin, Archive };
