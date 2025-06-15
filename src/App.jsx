@@ -59,13 +59,13 @@ export default function App() {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
                             <Link to="/" className="flex items-center">
-                                <Users className="h-8 w-8 text-blue-600" />
+                                <Users className="h-8 w-8 text-[#d64e78]" />
                                 <span className="ml-3 font-bold text-2xl text-gray-800">Wachtrij Systeem</span>
                             </Link>
                             <div className="flex items-center space-x-2">
-                                <NavLink to="/" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Kiosk</NavLink>
-                                <NavLink to="/display" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Weergave</NavLink>
-                                <NavLink to="/admin" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Beheer</NavLink>
+                                <NavLink to="/" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Kiosk</NavLink>
+                                <NavLink to="/display" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Weergave</NavLink>
+                                <NavLink to="/admin" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Beheer</NavLink>
                             </div>
                         </div>
                     </div>
@@ -120,17 +120,17 @@ function Kiosk() {
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
-                        <Ticket className="mx-auto h-24 w-24 text-blue-500 mb-6" />
+                        <Ticket className="mx-auto h-24 w-24 text-[#d64e78] mb-6" />
                         <h1 className="text-4xl md:text-5xl font-bold text-gray-800">Welkom!</h1>
                         <p className="mt-4 text-lg text-gray-600">Druk op de knop om een volgnummer te ontvangen.</p>
-                        <button onClick={getTicket} disabled={isLoading} className="mt-10 w-full bg-blue-600 text-white font-bold py-6 px-8 rounded-xl text-2xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center">
+                        <button onClick={getTicket} disabled={isLoading} className="mt-10 w-full bg-[#d64e78] text-white font-bold py-6 px-8 rounded-xl text-2xl hover:bg-[#c04169] focus:outline-none focus:ring-4 focus:ring-pink-300 transition-all duration-300 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center">
                             {isLoading ? <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : "Neem een volgnummer"}
                         </button>
                     </>
                 ) : (
                     <>
                         <h2 className="text-2xl font-semibold text-gray-600">Uw volgnummer is:</h2>
-                        <p className="text-8xl md:text-9xl font-extrabold text-blue-600 my-4 animate-pulse">{ticketNumber}</p>
+                        <p className="text-8xl md:text-9xl font-extrabold text-[#d64e78] my-4 animate-pulse">{ticketNumber}</p>
                         <p className="text-lg text-gray-600">Volg het weergavescherm om te zien wanneer u aan de beurt bent.</p>
                         <button onClick={() => setTicketNumber(null)} className="mt-10 bg-gray-200 text-gray-800 font-bold py-4 px-8 rounded-xl text-xl hover:bg-gray-300 transition-colors">Terug</button>
                     </>
@@ -158,7 +158,6 @@ function Display() {
         return () => document.body.removeEventListener('click', startAudio);
     }, []);
 
-    // ** DEFINITIVE FIX for Display Screen **
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         
