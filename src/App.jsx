@@ -521,3 +521,4 @@ style.innerHTML = `
   }
 `;
 document.head.appendChild(style);
+export { Kiosk, Display, Admin };
