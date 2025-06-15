@@ -9,16 +9,15 @@ const appMode = import.meta.env.VITE_APP_MODE;
 let ComponentToRender;
 
 // Deze 'Wrapper' component zorgt ervoor dat de losse pagina's (Kiosk, Display, Admin)
-// altijd de volledige schermhoogte innemen, net zoals wanneer de volledige app lokaal draait.
+// altijd de volledige schermhoogte innemen, door de layout van de hoofd-app exact na te bootsen.
 // Dit lost het probleem met de witte ruimte op Netlify definitief op.
 const PageWrapper = ({ children }) => (
-    <div className="h-screen flex flex-col">
-        <main className="flex-1 overflow-y-auto">
+    <div className="h-screen font-sans flex flex-col">
+        <main className="flex-1 overflow-hidden">
             {children}
         </main>
     </div>
 );
-
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
 switch (appMode) {
