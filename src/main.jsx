@@ -18,6 +18,7 @@ const PageWrapper = ({ children }) => (
     </div>
 );
 
+
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
 switch (appMode) {
   case 'kiosk':
