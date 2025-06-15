@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -22,9 +22,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
+const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
 // --- Main App Component ---
-// This component now uses react-router-dom to handle navigation.
 export default function App() {
     const [isAuthReady, setIsAuthReady] = useState(false);
 
@@ -52,7 +52,6 @@ export default function App() {
         );
     }
     
-    // Using BrowserRouter to enable routing
     return (
         <BrowserRouter>
             <div className="bg-gray-50 min-h-screen font-sans">
@@ -101,27 +100,17 @@ function Kiosk() {
             const newTicketNumber = await runTransaction(db, async (transaction) => {
                 const counterDoc = await transaction.get(counterRef);
                 let currentNumber = 0; 
-                if (counterDoc.exists()) {
-                    currentNumber = counterDoc.data().lastNumber;
-                }
+                if (counterDoc.exists()) { currentNumber = counterDoc.data().lastNumber; }
                 const newNumber = currentNumber + 1;
                 transaction.set(counterRef, { lastNumber: newNumber }, { merge: true });
-                await addDoc(ticketsCollectionRef, {
-                    ticketNumber: newNumber,
-                    status: 'waiting',
-                    createdAt: serverTimestamp(),
-                    location: null,
-                    calledAt: null,
-                });
+                await addDoc(ticketsCollectionRef, { ticketNumber: newNumber, status: 'waiting', createdAt: serverTimestamp(), location: null, calledAt: null });
                 return newNumber;
             });
             setTicketNumber(newTicketNumber);
         } catch (e) {
             console.error("Error getting ticket: ", e);
             setError("Kon geen nummer ophalen. Probeer het opnieuw.");
-        } finally {
-            setIsLoading(false);
-        }
+        } finally { setIsLoading(false); }
     };
 
     return (
@@ -132,11 +121,7 @@ function Kiosk() {
                         <Ticket className="mx-auto h-24 w-24 text-blue-500 mb-6" />
                         <h1 className="text-4xl md:text-5xl font-bold text-gray-800">Welkom!</h1>
                         <p className="mt-4 text-lg text-gray-600">Druk op de knop om een volgnummer te ontvangen.</p>
-                        <button
-                            onClick={getTicket}
-                            disabled={isLoading}
-                            className="mt-10 w-full bg-blue-600 text-white font-bold py-6 px-8 rounded-xl text-2xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
-                        >
+                        <button onClick={getTicket} disabled={isLoading} className="mt-10 w-full bg-blue-600 text-white font-bold py-6 px-8 rounded-xl text-2xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300 ease-in-out transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center">
                             {isLoading ? <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : "Neem een volgnummer"}
                         </button>
                     </>
@@ -157,13 +142,12 @@ function Kiosk() {
 
 // --- Display Component (Page: /display) ---
 function Display() {
-    const [calledTickets, setCalledTickets] = useState([]);
+    const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
     const audioRef = useRef(null);
 
     useEffect(() => {
         if (window.Tone) { audioRef.current = new window.Tone.Synth().toDestination(); } 
-        else { console.warn("Tone.js not available."); }
         const startAudio = () => {
             if (window.Tone && window.Tone.context.state !== 'running') { window.Tone.context.resume(); }
             document.body.removeEventListener('click', startAudio);
@@ -172,26 +156,36 @@ function Display() {
         return () => document.body.removeEventListener('click', startAudio);
     }, []);
 
+    // Listener for the most recent call
     useEffect(() => {
-        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(30));
+        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const newCalledTickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            if (calledTickets.length > 0 && newCalledTickets.length > 0 && newCalledTickets[0].id !== calledTickets[0].id) {
-                if (audioRef.current && window.Tone.context.state === 'running') { audioRef.current.triggerAttackRelease("C5", "8n"); }
+            if (!snapshot.empty) {
+                const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+                if (!mostRecentTicket || mostRecentTicket.id !== newTicket.id) {
+                    setMostRecentTicket(newTicket);
+                    if (audioRef.current && window.Tone.context.state === 'running') {
+                        audioRef.current.triggerAttackRelease("C5", "8n");
+                    }
+                }
+            } else {
+                setMostRecentTicket(null);
             }
-            setCalledTickets(newCalledTickets);
-
-            const latestCallsByLocation = {};
-            for (const ticket of newCalledTickets) {
-                if (ticket.location && !latestCallsByLocation[ticket.location]) { latestCallsByLocation[ticket.location] = ticket; }
-            }
-            const sortedBusyLocations = Object.values(latestCallsByLocation).sort((a, b) => a.location.localeCompare(b.location, 'nl-NL', { numeric: true }));
-            setBusyLocations(sortedBusyLocations);
-        }, (error) => { console.error("Error fetching called tickets:", error); });
+        });
         return () => unsubscribe();
-    }, [calledTickets]);
+    }, [mostRecentTicket]);
 
-    const mostRecentTicket = calledTickets.length > 0 ? calledTickets[0] : null;
+    // Listener for the status of all locations
+    useEffect(() => {
+        const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
+        const q = query(locationsRef, where('status', '==', 'busy'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const locations = snapshot.docs.map(doc => ({ name: doc.id, ...doc.data() }));
+            locations.sort((a, b) => a.name.localeCompare(b.name, 'nl-NL', { numeric: true }));
+            setBusyLocations(locations);
+        });
+        return () => unsubscribe();
+    }, []);
 
     return (
         <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8" style={{minHeight: 'calc(100vh - 64px)'}}>
@@ -215,10 +209,10 @@ function Display() {
                 <h3 className="text-3xl font-bold border-b-4 border-gray-500 pb-3 mb-6">Actieve Lokalen</h3>
                 {busyLocations.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                        {busyLocations.map(ticket => (
-                            <div key={ticket.location} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center animate-slide-in">
-                                <span className="font-bold text-2xl text-yellow-400">{ticket.location}</span>
-                                <span className="font-black text-4xl text-white mt-1"># {ticket.ticketNumber}</span>
+                        {busyLocations.map(loc => (
+                            <div key={loc.name} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center animate-slide-in">
+                                <span className="font-bold text-2xl text-yellow-400">{loc.name}</span>
+                                <span className="font-black text-4xl text-white mt-1"># {loc.ticketNumber}</span>
                             </div>
                         ))}
                     </div>
@@ -236,48 +230,88 @@ function Display() {
 // --- Admin Component (Page: /admin) ---
 function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
-    const [location, setLocation] = useState('Lokaal 1');
-    const [callingId, setCallingId] = useState(null);
+    const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-    
-    const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
+    // Get waiting tickets
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'), orderBy('createdAt', 'asc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setWaitingTickets(tickets);
-        }, (error) => { console.error("Error fetching waiting tickets:", error); });
+        });
         return () => unsubscribe();
     }, []);
 
-    const callNextTicket = async () => {
-        if (waitingTickets.length === 0) { alert("Er zijn geen wachtenden in de rij."); return; }
+    // Get status of all locations
+    useEffect(() => {
+        const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
+        const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
+            const states = {};
+            snapshot.forEach(doc => {
+                states[doc.id] = doc.data();
+            });
+            setLocationStates(states);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const callNextTicket = async (location) => {
         const nextTicket = waitingTickets[0];
-        setCallingId(nextTicket.id);
+        if (!nextTicket) {
+            alert("Er zijn geen wachtenden in de rij.");
+            return;
+        }
+
         const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, nextTicket.id);
+        const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+
         try {
-            await updateDoc(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
+            await runTransaction(db, async (transaction) => {
+                transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
+                transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
+            });
         } catch (e) {
             console.error("Error calling ticket: ", e);
             alert("Er is een fout opgetreden bij het oproepen van het nummer.");
-        } finally {
-            setCallingId(null);
+        }
+    };
+
+    const markAsFinished = async (location) => {
+        const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+        const ticketId = locationStates[location]?.ticketId;
+
+        try {
+            await runTransaction(db, async(transaction) => {
+                transaction.set(locationRef, { status: 'available', ticketNumber: null, ticketId: null });
+                if (ticketId) {
+                    const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, ticketId);
+                    transaction.update(ticketRef, { status: 'finished' });
+                }
+            });
+        } catch(e) {
+            console.error("Error finishing ticket: ", e);
+            alert("Kon de status niet bijwerken.");
         }
     };
     
     const handleResetQueue = async () => {
-        console.log("Resetting the entire queue...");
-        const ticketsCollectionRef = collection(db, `artifacts/${appId}/public/data/tickets`);
+        const ticketsRef = collection(db, `artifacts/${appId}/public/data/tickets`);
+        const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
         const counterRef = doc(db, `artifacts/${appId}/public/data/counters`, 'ticketCounter');
         
         try {
-            const querySnapshot = await getDocs(ticketsCollectionRef);
             const batch = writeBatch(db);
-            querySnapshot.forEach(doc => { batch.delete(doc.ref); });
+            const ticketsSnapshot = await getDocs(ticketsRef);
+            ticketsSnapshot.forEach(doc => batch.delete(doc.ref));
+            
+            availableLocations.forEach(loc => {
+                const locRef = doc(locationsRef, loc);
+                batch.set(locRef, { status: 'available', ticketNumber: null, ticketId: null });
+            });
+
             batch.set(counterRef, { lastNumber: 0 });
             await batch.commit();
-            console.log("Queue has been reset successfully.");
         } catch (e) {
             console.error("Failed to reset queue: ", e);
             alert("De wachtrij kon niet worden gereset.");
@@ -286,65 +320,74 @@ function Admin() {
         }
     };
 
-    const nextInLine = waitingTickets.length > 0 ? waitingTickets[0] : null;
-
     return (
         <>
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
-                    <button
-                        onClick={() => setIsResetModalOpen(true)}
-                        className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors"
-                    >
+                    <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
                         <RefreshCw className="w-5 h-5 mr-2" />
-                        Reset Wachtrij
+                        Reset Systeem
                     </button>
                 </div>
                 
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mb-8">
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-4">Volgende Klant Oproepen</h2>
-                    {nextInLine ? (
-                        <div className="flex flex-col md:flex-row items-stretch md:items-center space-y-4 md:space-y-0 md:space-x-4">
-                            <div className="flex items-center bg-gray-100 p-4 rounded-lg flex-shrink-0">
-                                 <Ticket className="w-8 h-8 text-blue-600 mr-3"/>
-                                <span className="text-3xl font-bold text-gray-800">{nextInLine.ticketNumber}</span>
-                            </div>
-                            <select value={location} onChange={(e) => setLocation(e.target.value)} className="flex-grow w-full md:w-auto p-4 border-2 bg-white border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition">
-                               {availableLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                            </select>
-                            <button onClick={callNextTicket} disabled={callingId !== null} className="w-full md:w-auto bg-green-500 text-white font-bold py-4 px-8 rounded-lg text-lg hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 ease-in-out flex items-center justify-center disabled:bg-gray-400">
-                                 {callingId === nextInLine.id ? 'Oproepen...' : 'Oproepen'}
-                                 <Send className="w-5 h-5 ml-2"/>
-                            </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Waiting List Section */}
+                    <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
+                        <div className="space-y-3">
+                            {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
+                                <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-blue-100 border-blue-400 border-2' : 'bg-gray-100'}`}>
+                                    <span className={`font-bold text-2xl ${index === 0 ? 'text-blue-600' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
+                                    <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
+                                </div>
+                            )) : <p className="text-center p-8 text-gray-500">De wachtrij is leeg.</p>}
+                             {waitingTickets.length > 5 && <p className="text-center text-sm text-gray-500 mt-4">... en {waitingTickets.length - 5} meer.</p>}
                         </div>
-                    ) : ( <p className="text-gray-500">Er staan momenteel geen mensen in de wachtrij.</p> )}
-                </div>
+                    </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                     <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-gray-600 uppercase text-sm"><tr><th className="p-3">Volgnummer</th><th className="p-3">Tijd van aanmelden</th></tr></thead>
-                            <tbody>
-                                {waitingTickets.map(ticket => (
-                                    <tr key={ticket.id} className="border-b hover:bg-gray-50">
-                                        <td className="p-3 font-bold text-lg text-gray-800">{ticket.ticketNumber}</td>
-                                        <td className="p-3 text-gray-600">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : 'Laden...'}</td>
-                                    </tr>
-                                ))}
-                                 {waitingTickets.length === 0 && (<tr><td colSpan="2" className="text-center p-8 text-gray-500">De wachtrij is leeg.</td></tr>)}
-                            </tbody>
-                        </table>
-                     </div>
+                    {/* Locations Status Section */}
+                    <div className="md:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status Lokalen</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {availableLocations.map(loc => {
+                                const state = locationStates[loc];
+                                const isBusy = state?.status === 'busy';
+                                const canCall = !isBusy && waitingTickets.length > 0;
+
+                                return (
+                                    <div key={loc} className={`p-4 rounded-lg transition-all ${isBusy ? 'bg-yellow-100' : 'bg-green-50'}`}>
+                                        <h3 className="font-bold text-lg text-gray-800">{loc}</h3>
+                                        {isBusy ? (
+                                            <>
+                                                <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
+                                                <button onClick={() => markAsFinished(loc)} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors">
+                                                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                                                    Voltooien
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-3xl font-black text-gray-400 my-2">-</p>
+                                                <button onClick={() => callNextTicket(loc)} disabled={!canCall} className="w-full mt-2 flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    <Send className="w-5 h-5 mr-2" />
+                                                    Volgende oproepen
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
             </div>
             <ConfirmationModal
                 isOpen={isResetModalOpen}
                 onClose={() => setIsResetModalOpen(false)}
                 onConfirm={handleResetQueue}
-                title="Wachtrij Resetten"
-                message="Weet u zeker dat u de volledige wachtrij wilt verwijderen en de teller wilt resetten? Deze actie kan niet ongedaan worden gemaakt."
+                title="Systeem Resetten"
+                message="Weet u zeker dat u de volledige wachtrij wilt verwijderen en alle lokalen wilt vrijgeven? Deze actie kan niet ongedaan worden gemaakt."
             />
         </>
     );
@@ -367,7 +410,6 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message }) {
         </div>
     );
 }
-
 
 // --- Style for animations ---
 const style = document.createElement('style');
