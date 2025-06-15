@@ -20,7 +20,7 @@ switch (appMode) {
     ComponentToRender = Admin;
     break;
   default:
-    // Standaard tonen we de volledige app met navigatie
+    // Standaard tonen we de volledige app met navigatie (voor lokale ontwikkeling)
     ComponentToRender = App;
     break;
 }
