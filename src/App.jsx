@@ -233,10 +233,12 @@ function Admin() {
     const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isSystemReady, setIsSystemReady] = useState(false); // ** NEW **
 
-    // ** NEW: Initialization Effect **
+    // ** REVISED: Initialization Effect **
     useEffect(() => {
-        const initializeLocations = async () => {
+        const initializeSystem = async () => {
+            console.log("Checking system initialization...");
             const locationsCollectionRef = collection(db, `artifacts/${appId}/public/data/locations`);
             const batch = writeBatch(db);
             let writesMade = false;
@@ -246,11 +248,7 @@ function Admin() {
                 try {
                     const docSnap = await getDoc(locationDocRef);
                     if (!docSnap.exists()) {
-                        batch.set(locationDocRef, {
-                            status: 'available',
-                            ticketNumber: null,
-                            ticketId: null,
-                        });
+                        batch.set(locationDocRef, { status: 'available', ticketNumber: null, ticketId: null });
                         writesMade = true;
                     }
                 } catch (error) {
@@ -262,10 +260,12 @@ function Admin() {
                 console.log("Initializing missing location documents...");
                 await batch.commit();
             }
+            console.log("System is ready.");
+            setIsSystemReady(true); // ** NEW **
         };
 
-        initializeLocations();
-    }, []); // Empty dependency array means it runs once on mount.
+        initializeSystem();
+    }, []); 
 
     // Get waiting tickets
     useEffect(() => {
@@ -316,9 +316,10 @@ function Admin() {
                 transaction.set(locationRef, { status: 'busy', ticketNumber: nextTicket.ticketNumber, ticketId: nextTicket.id });
             });
         } catch (e) {
+            // ** REVISED: Detailed error logging **
+            console.error("TRANSACTION FAILED: ", e);
             if (e.message !== "No tickets in queue") {
-                console.error("Error calling ticket: ", e);
-                alert("Er is een fout opgetreden bij het oproepen van het nummer.");
+                alert(`Fout bij oproepen: ${e.message}`);
             }
         } finally {
             setIsProcessing(false);
@@ -339,8 +340,9 @@ function Admin() {
                 }
             });
         } catch(e) {
-            console.error("Error finishing ticket: ", e);
-            alert("Kon de status niet bijwerken.");
+            // ** REVISED: Detailed error logging **
+            console.error("FINISH FAILED: ", e);
+            alert(`Kon status niet bijwerken: ${e.message}`);
         } finally {
              setIsProcessing(false);
         }
@@ -398,36 +400,44 @@ function Admin() {
 
                     <div className="md:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status Lokalen</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {availableLocations.map(loc => {
-                                const state = locationStates[loc];
-                                const isBusy = state?.status === 'busy';
-                                const canCall = !isBusy && waitingTickets.length > 0;
+                        {/* ** NEW: System ready check ** */}
+                        {!isSystemReady ? (
+                             <div className="flex items-center justify-center h-48">
+                                <Loader2 className="w-8 h-8 animate-spin text-gray-400"/>
+                                <p className="ml-4 text-gray-500">Systeem initialiseren...</p>
+                             </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {availableLocations.map(loc => {
+                                    const state = locationStates[loc];
+                                    const isBusy = state?.status === 'busy';
+                                    const canCall = !isBusy && waitingTickets.length > 0;
 
-                                return (
-                                    <div key={loc} className={`p-4 rounded-lg transition-all ${isBusy ? 'bg-yellow-100' : 'bg-green-50'}`}>
-                                        <h3 className="font-bold text-lg text-gray-800">{loc}</h3>
-                                        {isBusy ? (
-                                            <>
-                                                <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
-                                                <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                                                    {!isProcessing && 'Voltooien'}
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <p className="text-3xl font-black text-gray-400 my-2">-</p>
-                                                <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                                     {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
-                                                    {!isProcessing && 'Volgende oproepen'}
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    return (
+                                        <div key={loc} className={`p-4 rounded-lg transition-all ${isBusy ? 'bg-yellow-100' : 'bg-green-50'}`}>
+                                            <h3 className="font-bold text-lg text-gray-800">{loc}</h3>
+                                            {isBusy ? (
+                                                <>
+                                                    <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
+                                                    <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                        {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                                                        {!isProcessing && 'Voltooien'}
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="text-3xl font-black text-gray-400 my-2">-</p>
+                                                    <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-blue-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                         {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
+                                                        {!isProcessing && 'Volgende oproepen'}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
