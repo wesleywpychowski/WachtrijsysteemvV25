@@ -83,7 +83,6 @@ export default function App() {
 }
 
 // --- Kiosk Component (Home Page: /) ---
-// ** REVISED for data integrity **
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -102,10 +101,8 @@ function Kiosk() {
                 if (counterDoc.exists()) { currentNumber = counterDoc.data().lastNumber; }
                 const newNumber = currentNumber + 1;
                 
-                // Correctly create a new document reference within the transaction
                 const newTicketRef = doc(collection(db, `artifacts/${appId}/public/data/tickets`));
 
-                // Atomically update the counter and create the new ticket
                 transaction.set(counterRef, { lastNumber: newNumber }, { merge: true });
                 transaction.set(newTicketRef, { ticketNumber: newNumber, status: 'waiting', createdAt: serverTimestamp(), location: null, calledAt: null });
                 
@@ -271,13 +268,27 @@ function Admin() {
         initializeSystem();
     }, []); 
 
-    // Get waiting tickets
+    // ** REVISED: Get waiting tickets (client-side sort for robustness) **
     useEffect(() => {
-        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'), orderBy('createdAt', 'asc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setWaitingTickets(tickets);
-        });
+        const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'));
+        const unsubscribe = onSnapshot(q, 
+            (snapshot) => {
+                const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Sort client-side to avoid complex Firestore index requirements
+                tickets.sort((a, b) => {
+                    const timeA = a.createdAt?.seconds || 0;
+                    const timeB = b.createdAt?.seconds || 0;
+                    return timeA - timeB;
+                });
+
+                setWaitingTickets(tickets);
+            },
+            (error) => {
+                console.error("Fout bij ophalen van de wachtrij:", error);
+                alert(`Kon de wachtrij niet laden: ${error.message}`);
+            }
+        );
         return () => unsubscribe();
     }, []);
 
