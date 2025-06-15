@@ -26,6 +26,10 @@ const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}
 
 // --- Main App Component ---
 function App() {
+    useEffect(() => {
+        document.title = 'Wachtrij Systeem';
+    }, []);
+
     return (
         <BrowserRouter>
             <div className="bg-gray-50 min-h-screen font-sans">
@@ -61,6 +65,10 @@ function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        document.title = 'Kiosk | Wachtrij Systeem';
+    }, []);
 
     const getTicket = async () => {
         setIsLoading(true);
@@ -121,6 +129,10 @@ function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
     const audioRef = useRef(null);
+
+    useEffect(() => {
+        document.title = 'Weergave | Wachtrij Systeem';
+    }, []);
 
     useEffect(() => {
         if (window.Tone) { audioRef.current = new window.Tone.Synth().toDestination(); } 
@@ -224,6 +236,10 @@ function Admin() {
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSystemReady, setIsSystemReady] = useState(false);
+
+    useEffect(() => {
+        document.title = 'Beheer | Wachtrij Systeem';
+    }, []);
 
     useEffect(() => {
         const initializeSystem = async () => {
