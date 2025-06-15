@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-hidden">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -98,7 +98,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full overflow-y-auto">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -154,8 +154,10 @@ function Display() {
                     
                     setMostRecentTicket(currentTicket => {
                         if (!currentTicket || currentTicket.id !== newTicket.id) {
-                            if (audioRef.current && window.Tone.context.state === 'running') {
-                                audioRef.current.triggerAttackRelease("C5", "8n");
+                            if (audioRef.current && window.Tone && window.Tone.context.state === 'running') {
+                                const now = window.Tone.now();
+                                audioRef.current.triggerAttackRelease("C5", "8n", now);
+                                audioRef.current.triggerAttackRelease("G5", "8n", now + 0.2);
                             }
                             return newTicket;
                         }
