@@ -32,7 +32,7 @@ function App() {
 
     return (
         <BrowserRouter>
-            <div className="bg-gray-50 min-h-screen font-sans flex flex-col">
+            <div className="bg-gray-50 h-screen font-sans flex flex-col">
                 <nav className="bg-white shadow-md">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main className="flex-1 flex flex-col">
+                <main className="flex-1 overflow-y-auto">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -98,7 +98,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center flex-1">
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -190,7 +190,7 @@ function Display() {
     }, []);
 
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1">
+        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
             <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
@@ -396,70 +396,68 @@ function Admin() {
     };
 
     return (
-        <>
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
-                    <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
-                        <RefreshCw className="w-5 h-5 mr-2" />
-                        Reset Systeem
-                    </button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
-                        <div className="space-y-3">
-                            {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
-                                <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
-                                    <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
-                                    <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
-                                </div>
-                            )) : <p className="text-center p-8 text-gray-500">De wachtrij is leeg.</p>}
-                             {waitingTickets.length > 5 && <p className="text-center text-sm text-gray-500 mt-4">... en {waitingTickets.length - 5} meer.</p>}
-                        </div>
-                    </div>
-
-                    <div className="md:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status Lokalen</h2>
-                        {!isSystemReady ? (
-                             <div className="flex items-center justify-center h-48">
-                                <Loader2 className="w-8 h-8 animate-spin text-gray-400"/>
-                                <p className="ml-4 text-gray-500">Systeem initialiseren...</p>
-                             </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {availableLocations.map(loc => {
-                                    const state = locationStates[loc];
-                                    const isBusy = state?.status === 'busy';
-                                    const canCall = !isBusy && waitingTickets.length > 0;
-
-                                    return (
-                                        <div key={loc} className={`p-4 rounded-lg transition-all ${isBusy ? 'bg-yellow-100' : 'bg-green-50'}`}>
-                                            <h3 className="font-bold text-lg text-gray-800">{loc}</h3>
-                                            {isBusy ? (
-                                                <>
-                                                    <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
-                                                    <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                                        {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                                                        {!isProcessing && 'Voltooien'}
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p className="text-3xl font-black text-gray-400 my-2">-</p>
-                                                    <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-[#d64e78] text-white font-semibold py-2 px-3 rounded-md hover:bg-[#c04169] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                                         {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
-                                                        {!isProcessing && 'Volgende oproepen'}
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+        <div className="p-4 sm:p-6 lg:p-8 h-full">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
+                <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
+                    <RefreshCw className="w-5 h-5 mr-2" />
+                    Reset Systeem
+                </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-4">Wachtrij ({waitingTickets.length})</h2>
+                    <div className="space-y-3">
+                        {waitingTickets.length > 0 ? waitingTickets.slice(0, 5).map((ticket, index) => (
+                            <div key={ticket.id} className={`p-3 rounded-lg flex justify-between items-center ${index === 0 ? 'bg-pink-100 border-[#d64e78] border-2' : 'bg-gray-100'}`}>
+                                <span className={`font-bold text-2xl ${index === 0 ? 'text-[#d64e78]' : 'text-gray-800'}`}>{ticket.ticketNumber}</span>
+                                <span className="text-sm text-gray-500">{ticket.createdAt ? new Date(ticket.createdAt.seconds * 1000).toLocaleTimeString('nl-NL') : ''}</span>
                             </div>
-                        )}
+                        )) : <p className="text-center p-8 text-gray-500">De wachtrij is leeg.</p>}
+                         {waitingTickets.length > 5 && <p className="text-center text-sm text-gray-500 mt-4">... en {waitingTickets.length - 5} meer.</p>}
                     </div>
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status Lokalen</h2>
+                    {!isSystemReady ? (
+                         <div className="flex items-center justify-center h-48">
+                            <Loader2 className="w-8 h-8 animate-spin text-gray-400"/>
+                            <p className="ml-4 text-gray-500">Systeem initialiseren...</p>
+                         </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {availableLocations.map(loc => {
+                                const state = locationStates[loc];
+                                const isBusy = state?.status === 'busy';
+                                const canCall = !isBusy && waitingTickets.length > 0;
+
+                                return (
+                                    <div key={loc} className={`p-4 rounded-lg transition-all ${isBusy ? 'bg-yellow-100' : 'bg-green-50'}`}>
+                                        <h3 className="font-bold text-lg text-gray-800">{loc}</h3>
+                                        {isBusy ? (
+                                            <>
+                                                <p className="text-3xl font-black text-gray-900 my-2"># {state.ticketNumber}</p>
+                                                <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full mt-2 flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                                                    {!isProcessing && 'Voltooien'}
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-3xl font-black text-gray-400 my-2">-</p>
+                                                <button onClick={() => callNextTicket(loc)} disabled={!canCall || isProcessing} className="w-full mt-2 flex items-center justify-center bg-[#d64e78] text-white font-semibold py-2 px-3 rounded-md hover:bg-[#c04169] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                     {isProcessing ? <Loader2 className="w-5 h-5 animate-spin"/> : <Send className="w-5 h-5 mr-2" />}
+                                                    {!isProcessing && 'Volgende oproepen'}
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
             <ConfirmationModal
