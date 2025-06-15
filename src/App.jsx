@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Volume2 } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -128,24 +128,11 @@ function Kiosk() {
 function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
-    const audioSynth = useRef(null);
-    const [isAudioReady, setIsAudioReady] = useState(false);
-    const lastPlayedTicketId = useRef(null);
+    const [flash, setFlash] = useState(false);
 
     useEffect(() => {
         document.title = 'Weergave | Wachtrij Systeem';
     }, []);
-
-    const initializeAudio = async () => {
-        if (window.Tone && window.Tone.context.state !== 'running') {
-            await window.Tone.start();
-            console.log("Audio Context is nu actief.");
-        }
-        if (!audioSynth.current && window.Tone) {
-            audioSynth.current = new window.Tone.Synth().toDestination();
-        }
-        setIsAudioReady(true);
-    };
 
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
@@ -153,7 +140,14 @@ function Display() {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             if (!snapshot.empty) {
                 const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                setMostRecentTicket(newTicket);
+                
+                setMostRecentTicket(currentTicket => {
+                    if (!currentTicket || currentTicket.id !== newTicket.id) {
+                        setFlash(true); // Trigger flash animation
+                        return newTicket;
+                    }
+                    return currentTicket;
+                });
             } else {
                 setMostRecentTicket(null);
             }
@@ -169,15 +163,13 @@ function Display() {
     }, []);
 
     useEffect(() => {
-        if (isAudioReady && mostRecentTicket && mostRecentTicket.id !== lastPlayedTicketId.current) {
-            if (audioSynth.current && window.Tone && window.Tone.context.state === 'running') {
-                const now = window.Tone.now();
-                audioSynth.current.triggerAttackRelease("C5", "8n", now);
-                audioSynth.current.triggerAttackRelease("G5", "8n", now + 0.2);
-                lastPlayedTicketId.current = mostRecentTicket.id;
-            }
+        if (flash) {
+            const timer = setTimeout(() => {
+                setFlash(false);
+            }, 2000); // Animation duration
+            return () => clearTimeout(timer);
         }
-    }, [mostRecentTicket, isAudioReady]);
+    }, [flash]);
 
     // Listener for the status of all locations
     useEffect(() => {
@@ -192,19 +184,8 @@ function Display() {
     }, []);
 
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full relative">
-            {!isAudioReady && (
-                <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-                    <button 
-                        onClick={initializeAudio}
-                        className="bg-[#d64e78] text-white font-bold py-6 px-10 rounded-lg text-2xl flex items-center gap-3 animate-pulse"
-                    >
-                        <Volume2 size={32} />
-                        Klik hier om geluid te activeren
-                    </button>
-                </div>
-            )}
-            <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
+        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+            <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl transition-all duration-300 ${flash ? 'animate-flash' : ''}`}>
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
@@ -560,9 +541,15 @@ style.innerHTML = `
   .animate-slide-in {
     animation: slide-in 0.5s ease-out;
   }
+  @keyframes flash-border {
+    50% { box-shadow: 0 0 0 12px rgba(253, 224, 71, 0.7); }
+    100% { box-shadow: 0 0 0 20px rgba(253, 224, 71, 0); }
+  }
+  .animate-flash {
+    animation: flash-border 1.5s ease-out;
+  }
 `;
 document.head.appendChild(style);
 
-// This is the correct way to export for the main.jsx file
-export { App, Kiosk, Display, Admin };
 export default App;
+export { Kiosk, Display, Admin };
