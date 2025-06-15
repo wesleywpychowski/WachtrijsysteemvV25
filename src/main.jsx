@@ -18,6 +18,7 @@ const PageWrapper = ({ children }) => (
     </div>
 );
 
+
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
 switch (appMode) {
   case 'kiosk':
@@ -30,8 +31,8 @@ switch (appMode) {
     ComponentToRender = <PageWrapper><Admin /></PageWrapper>;
     break;
   case 'archive':
-    ComponentToRender = <PageWrapper><Archive /></PageWrapper>;
-    break;
+      ComponentToRender = <PageWrapper><Archive /></PageWrapper>;
+      break;
   default:
     // Standaard tonen we de volledige app met navigatie (voor lokale ontwikkeling)
     ComponentToRender = <App />;
