@@ -32,7 +32,7 @@ function App() {
 
     return (
         <BrowserRouter>
-            <div className="bg-gray-50 min-h-screen font-sans">
+            <div className="bg-gray-50 min-h-screen font-sans flex flex-col">
                 <nav className="bg-white shadow-md">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
@@ -48,7 +48,7 @@ function App() {
                         </div>
                     </div>
                 </nav>
-                <main>
+                <main className="flex-1">
                     <Routes>
                         <Route path="/" element={<Kiosk />} />
                         <Route path="/display" element={<Display />} />
@@ -98,7 +98,7 @@ function Kiosk() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center" style={{minHeight: 'calc(100vh - 64px)'}}>
+        <div className="flex flex-col items-center justify-center p-8 text-center h-full">
             <div className="bg-white p-12 rounded-2xl shadow-xl max-w-2xl w-full">
                 {!ticketNumber ? (
                     <>
@@ -190,7 +190,7 @@ function Display() {
     }, []);
 
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8" style={{minHeight: 'calc(100vh - 64px)'}}>
+        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
             <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
