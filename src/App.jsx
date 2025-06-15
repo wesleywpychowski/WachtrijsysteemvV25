@@ -530,7 +530,7 @@ function Archive() {
                         ))}
                     </tbody>
                 </table>
-                 {filteredTickets.length === 0 && (
+                 {finishedTickets.length === 0 && (
                      <p className="text-center p-8 text-gray-500">Geen voltooide tickets gevonden.</p>
                  )}
             </div>
