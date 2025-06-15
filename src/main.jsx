@@ -9,30 +9,31 @@ const appMode = import.meta.env.VITE_APP_MODE;
 let ComponentToRender;
 
 // Deze 'Wrapper' component zorgt ervoor dat de losse pagina's
-// altijd de volledige schermhoogte innemen.
+// altijd de volledige schermhoogte innemen en voorziet de benodigde router-context.
 const PageWrapper = ({ children }) => (
-    <div className="h-screen font-sans flex flex-col">
-        <main className="flex-1 overflow-hidden">
-            {children}
-        </main>
-    </div>
+    <BrowserRouter>
+        <div className="h-screen font-sans flex flex-col">
+            <main className="flex-1 overflow-y-auto">
+                {children}
+            </main>
+        </div>
+    </BrowserRouter>
 );
 
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
-// De BrowserRouter is nu toegevoegd om de 'basename' fout op te lossen.
 switch (appMode) {
   case 'kiosk':
-    ComponentToRender = <BrowserRouter><PageWrapper><Kiosk /></PageWrapper></BrowserRouter>;
+    ComponentToRender = <PageWrapper><Kiosk /></PageWrapper>;
     break;
   case 'display':
-    ComponentToRender = <BrowserRouter><PageWrapper><Display /></PageWrapper></BrowserRouter>;
+    ComponentToRender = <PageWrapper><Display /></PageWrapper>;
     break;
   case 'admin':
-    ComponentToRender = <BrowserRouter><PageWrapper><Admin /></PageWrapper></BrowserRouter>;
+    ComponentToRender = <PageWrapper><Admin /></PageWrapper>;
     break;
   case 'archive':
-      ComponentToRender = <BrowserRouter><PageWrapper><Archive /></PageWrapper></BrowserRouter>;
+      ComponentToRender = <PageWrapper><Archive /></PageWrapper>;
       break;
   default:
     // Standaard tonen we de volledige app met navigatie (voor lokale ontwikkeling)
