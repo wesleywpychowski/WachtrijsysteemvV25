@@ -231,9 +231,11 @@ function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(null); // Changed to store location name
+    const [isProcessing, setIsProcessing] = useState(null);
     const [isSystemReady, setIsSystemReady] = useState(false);
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+    const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+    const [finishComment, setFinishComment] = useState("");
     const [selectedLocation, setSelectedLocation] = useState(null);
 
     useEffect(() => {
@@ -368,21 +370,27 @@ function Admin() {
         }
     };
 
-    const markAsFinished = async (location) => {
+    const handleOpenFinishModal = (location) => {
+        setSelectedLocation(location);
+        setIsFinishModalOpen(true);
+    };
+
+    const markAsFinished = async (location, comment) => {
         if (!location || typeof location !== 'string') {
             alert("Interne fout: ongeldige locatie.");
             return;
         }
         setIsProcessing(location);
-        const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+        setIsFinishModalOpen(false);
         const ticketId = locationStates[location]?.ticketId;
 
         try {
             await runTransaction(db, async(transaction) => {
+                const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
                 transaction.set(locationRef, { status: 'available', ticketNumber: null, ticketId: null });
                 if (ticketId) {
                     const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, ticketId);
-                    transaction.update(ticketRef, { status: 'finished' });
+                    transaction.update(ticketRef, { status: 'finished', comment: comment || null });
                 }
             });
         } catch(e) {
@@ -390,6 +398,8 @@ function Admin() {
             alert(`Kon status niet bijwerken: ${e.message}`);
         } finally {
              setIsProcessing(null);
+             setFinishComment("");
+             setSelectedLocation(null);
         }
     };
     
@@ -472,7 +482,7 @@ function Admin() {
                                                         {isProcessing === loc ? <Loader2 className="w-5 h-5 animate-spin"/> : <Undo2 className="w-5 h-5 mr-2" />}
                                                         {isProcessing !== loc && 'Terug'}
                                                     </button>
-                                                    <button onClick={() => markAsFinished(loc)} disabled={isProcessing} className="w-full flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    <button onClick={() => handleOpenFinishModal(loc)} disabled={isProcessing} className="w-full flex items-center justify-center bg-green-500 text-white font-semibold py-2 px-3 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
                                                         {isProcessing === loc ? <Loader2 className="w-5 h-5 animate-spin"/> : <CheckCircle2 className="w-5 h-5 mr-2" />}
                                                         {isProcessing !== loc && 'Voltooien'}
                                                     </button>
@@ -500,6 +510,14 @@ function Admin() {
                 tickets={waitingTickets}
                 location={selectedLocation}
                 onSelectTicket={callSpecificTicket}
+            />
+            <FinishModal
+                isOpen={isFinishModalOpen}
+                onClose={() => setIsFinishModalOpen(false)}
+                location={selectedLocation}
+                comment={finishComment}
+                setComment={setFinishComment}
+                onConfirm={markAsFinished}
             />
             <ConfirmationModal
                 isOpen={isResetModalOpen}
@@ -552,21 +570,23 @@ function Archive() {
                             <th className="p-3 font-semibold text-gray-600">Volgnummer</th>
                             <th className="p-3 font-semibold text-gray-600">Lokaal</th>
                             <th className="p-3 font-semibold text-gray-600">Geholpen om</th>
+                            <th className="p-3 font-semibold text-gray-600">Opmerking</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {finishedTickets.map(ticket => (
+                        {filteredTickets.map(ticket => (
                             <tr key={ticket.id} className="border-b hover:bg-gray-50">
                                 <td className="p-3 font-bold text-lg"># {ticket.ticketNumber}</td>
                                 <td className="p-3 text-gray-700">{ticket.location}</td>
                                 <td className="p-3 text-gray-500">
                                     {ticket.calledAt ? new Date(ticket.calledAt.seconds * 1000).toLocaleString('nl-NL') : '-'}
                                 </td>
+                                <td className="p-3 text-gray-500">{ticket.comment || '-'}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-                 {finishedTickets.length === 0 && (
+                 {filteredTickets.length === 0 && (
                      <p className="text-center p-8 text-gray-500">Geen voltooide tickets gevonden.</p>
                  )}
             </div>
@@ -604,6 +624,31 @@ function TicketSelectionModal({ isOpen, onClose, tickets, location, onSelectTick
                     ) : (
                         <p className="text-center text-gray-500 py-8">Geen nummers in de wachtrij.</p>
                     )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- FinishModal Component ---
+function FinishModal({ isOpen, onClose, onConfirm, location, comment, setComment }) {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full animate-fade-in">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Voltooi oproep voor {location}</h2>
+                <p className="text-gray-600 mb-4">Voeg optioneel een opmerking toe.</p>
+                <textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Opmerking (optioneel)..."
+                    className="w-full p-2 border border-gray-300 rounded-md mb-6"
+                    rows="3"
+                ></textarea>
+                <div className="flex justify-end space-x-4">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-semibold transition-colors">Annuleren</button>
+                    <button onClick={() => onConfirm(location, comment)} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold transition-colors">Bevestigen</button>
                 </div>
             </div>
         </div>
@@ -656,4 +701,8 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App as default, Kiosk, Display, Admin, Archive };
+export default App;
+export { Kiosk, Display, Admin, Archive };
+
+
+//export { App as default, Kiosk, Display, Admin, Archive };
