@@ -205,7 +205,7 @@ function Display() {
 
     return (
         <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8" style={{minHeight: 'calc(100vh - 64px)'}}>
-            <div className="lg:col-span-2 bg-blue-600 rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
+            <div className="lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl">
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
@@ -215,8 +215,8 @@ function Display() {
                     </>
                 ) : (
                     <div className="text-center">
-                        <Monitor className="mx-auto h-32 w-32 text-blue-300 mb-6" />
-                        <p className="text-4xl font-semibold text-blue-200">Wacht op de eerste oproep...</p>
+                        <Monitor className="mx-auto h-32 w-32 text-pink-200 mb-6" />
+                        <p className="text-4xl font-semibold text-pink-100">Wacht op de eerste oproep...</p>
                     </div>
                 )}
             </div>
