@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component (for local development with navigation) ---
+// --- Main App Component ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -62,7 +62,7 @@ function App() {
     );
 }
 
-// --- Kiosk Component (Single Page) ---
+// --- Kiosk Component (Home Page: /) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -162,6 +162,7 @@ function Display() {
                 
                 if (newTicket.id !== lastPlayedId.current) {
                     setMostRecentTicket(newTicket);
+                    setFlash(true);
                     lastPlayedId.current = newTicket.id;
                     if (isAudioReady && audioRef.current) {
                         audioRef.current.currentTime = 0;
@@ -220,7 +221,7 @@ function Display() {
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
-                        <p className="text-8xl md:text-9xl lg:text-[12rem] font-black my-4 text-white animate-fade-in">{mostRecentTicket.ticketNumber}</p>
+                        <p className="text-8xl md:text-9xl lg:text-[12rem] font-black my-4 text-white">{mostRecentTicket.ticketNumber}</p>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Ga naar</h2>
                         <p className="text-6xl md:text-7xl lg:text-[7rem] font-bold text-white mt-4">{mostRecentTicket.location}</p>
                     </>
@@ -739,4 +740,5 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App as default, Kiosk, Display, Admin, Archive };
+export default App;
+export { Kiosk, Display, Admin, Archive };
