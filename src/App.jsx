@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2 } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2, Volume2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -131,11 +131,28 @@ function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
     const [flash, setFlash] = useState(false);
+    const [isAudioReady, setIsAudioReady] = useState(false);
+    const audioRef = useRef(null);
+    const lastPlayedId = useRef(null);
 
     useEffect(() => {
         document.title = 'Weergave | Wachtrij Systeem';
     }, []);
 
+    const initializeAudio = async () => {
+        if (audioRef.current) {
+            try {
+                await audioRef.current.play();
+                audioRef.current.pause(); 
+                setIsAudioReady(true);
+                console.log("Geluid geactiveerd.");
+            } catch (error) {
+                console.error("Audio activering mislukt:", error);
+                alert("Kon het geluid niet activeren. Klik nogmaals of controleer uw browserinstellingen.");
+            }
+        }
+    };
+    
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         
@@ -143,13 +160,15 @@ function Display() {
             if (!snapshot.empty) {
                 const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
                 
-                setMostRecentTicket(currentTicket => {
-                    if (!currentTicket || currentTicket.id !== newTicket.id) {
-                        setFlash(true);
-                        return newTicket;
+                if (newTicket.id !== lastPlayedId.current) {
+                    setMostRecentTicket(newTicket);
+                    setFlash(true);
+                    lastPlayedId.current = newTicket.id;
+                    if (isAudioReady && audioRef.current) {
+                        audioRef.current.currentTime = 0;
+                        audioRef.current.play();
                     }
-                    return currentTicket;
-                });
+                }
             } else {
                 setMostRecentTicket(null);
             }
@@ -162,7 +181,7 @@ function Display() {
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [isAudioReady]); // Re-run when audio is ready
 
     useEffect(() => {
         if (flash) {
@@ -185,7 +204,19 @@ function Display() {
     }, []);
 
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full relative">
+             <audio ref={audioRef} src="https://methodeschoolvanveldeke.be/wp-content/uploads/2025/06/notificationwachtrij.mp3" preload="auto"></audio>
+            {!isAudioReady && (
+                <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                    <button 
+                        onClick={initializeAudio}
+                        className="bg-[#d64e78] text-white font-bold py-6 px-10 rounded-lg text-2xl flex items-center gap-3 animate-pulse"
+                    >
+                        <Volume2 size={32} />
+                        Klik hier om geluid te activeren
+                    </button>
+                </div>
+            )}
             <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl transition-all duration-300 ${flash ? 'animate-flash' : ''}`}>
                 {mostRecentTicket ? (
                     <>
@@ -707,8 +738,5 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export { App as default, Kiosk, Display, Admin, Archive };
-
-
-
-//export { App as default, Kiosk, Display, Admin, Archive };
+export { App, Kiosk, Display, Admin, Archive };
+export default App;
