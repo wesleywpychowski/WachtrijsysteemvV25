@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App, { Kiosk, Display, Admin, Archive } from './App.jsx'
+import { App, Kiosk, Display, Admin, Archive } from './App.jsx'
 import { BrowserRouter } from 'react-router-dom';
 import './index.css'
 
@@ -13,7 +13,7 @@ let ComponentToRender;
 // altijd de volledige schermhoogte innemen.
 const PageWrapper = ({ children }) => (
     <div className="h-screen font-sans flex flex-col">
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
             {children}
         </main>
     </div>
@@ -21,7 +21,6 @@ const PageWrapper = ({ children }) => (
 
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
-// De BrowserRouter is nu toegevoegd om de 'basename' fout op te lossen.
 switch (appMode) {
   case 'kiosk':
     ComponentToRender = <PageWrapper><Kiosk /></PageWrapper>;
@@ -30,10 +29,10 @@ switch (appMode) {
     ComponentToRender = <PageWrapper><Display /></PageWrapper>;
     break;
   case 'admin':
-    ComponentToRender = <BrowserRouter><PageWrapper><Admin /></PageWrapper></BrowserRouter>;
+    ComponentToRender = <PageWrapper><Admin /></PageWrapper>;
     break;
   case 'archive':
-      ComponentToRender = <BrowserRouter><PageWrapper><Archive /></PageWrapper></BrowserRouter>;
+      ComponentToRender = <PageWrapper><Archive /></PageWrapper>;
       break;
   default:
     // Standaard tonen we de volledige app met navigatie (voor lokale ontwikkeling)
@@ -43,6 +42,8 @@ switch (appMode) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {ComponentToRender}
+    <BrowserRouter>
+      {ComponentToRender}
+    </BrowserRouter>
   </React.StrictMode>,
 )

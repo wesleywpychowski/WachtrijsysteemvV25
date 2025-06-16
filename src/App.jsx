@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc, setDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2, Volume2 } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2, Edit } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -22,47 +22,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
-const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component ---
-function App() {
-    useEffect(() => {
-        document.title = 'Wachtrij Systeem';
-    }, []);
+// --- Page Components ---
 
-    return (
-        <BrowserRouter>
-            <div className="bg-gray-50 h-screen font-sans flex flex-col">
-                <nav className="bg-white shadow-md flex-shrink-0 z-10">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between h-16">
-                            <Link to="/" className="flex items-center">
-                                <Users className="h-8 w-8 text-[#d64e78]" />
-                                <span className="ml-3 font-bold text-2xl text-gray-800">Wachtrij Systeem</span>
-                            </Link>
-                            <div className="flex items-center space-x-2">
-                                <NavLink to="/" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Kiosk</NavLink>
-                                <NavLink to="/display" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Weergave</NavLink>
-                                <NavLink to="/admin" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Beheer</NavLink>
-                                <NavLink to="/archive" className={({isActive}) => `px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-[#d64e78] text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>Archief</NavLink>
-                            </div>
-                        </div>
-                    </div>
-                </nav>
-                <main className="flex-1 overflow-y-auto">
-                    <Routes>
-                        <Route path="/" element={<Kiosk />} />
-                        <Route path="/display" element={<Display />} />
-                        <Route path="/admin" element={<Admin />} />
-                        <Route path="/archive" element={<Archive />} />
-                    </Routes>
-                </main>
-            </div>
-        </BrowserRouter>
-    );
-}
-
-// --- Kiosk Component (Home Page: /) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -126,7 +88,6 @@ function Kiosk() {
     );
 }
 
-// --- Display Component (Single Page) ---
 function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
@@ -239,7 +200,7 @@ function Display() {
                     {busyLocations.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
                             {busyLocations.map(loc => (
-                                <div key={loc.name} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center animate-slide-in">
+                                <div key={loc.name} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center">
                                     <span className="font-bold text-2xl text-yellow-400">{loc.name}</span>
                                     <span className="font-black text-4xl text-white mt-1"># {loc.ticketNumber}</span>
                                 </div>
@@ -257,20 +218,34 @@ function Display() {
     );
 }
 
-// --- Admin Component (Single Page) ---
 function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
+    const [editableLocations, setEditableLocations] = useState([]);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(null);
     const [isSystemReady, setIsSystemReady] = useState(false);
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
     const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [finishComment, setFinishComment] = useState("");
     const [selectedLocation, setSelectedLocation] = useState(null);
 
     useEffect(() => {
         document.title = 'Beheer | Wachtrij Systeem';
+
+        const configRef = doc(db, `artifacts/${appId}/public/data/config`, 'locations');
+        const unsubscribe = onSnapshot(configRef, async (docSnap) => {
+            if (docSnap.exists() && docSnap.data().names) {
+                setEditableLocations(docSnap.data().names);
+            } else {
+                const defaultLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
+                await setDoc(configRef, { names: defaultLocations });
+                setEditableLocations(defaultLocations);
+            }
+        });
+        
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -280,7 +255,8 @@ function Admin() {
             const batch = writeBatch(db);
             let writesMade = false;
 
-            for (const locationName of availableLocations) {
+            for (const locationName of editableLocations) {
+                if (!locationName) continue;
                 const locationDocRef = doc(locationsCollectionRef, locationName);
                 try {
                     const docSnap = await getDoc(locationDocRef);
@@ -297,33 +273,27 @@ function Admin() {
                 console.log("Initializing missing location documents...");
                 await batch.commit();
             }
-            console.log("System is ready.");
-            setIsSystemReady(true);
+            if (editableLocations.length > 0) {
+                 console.log("System is ready.");
+                 setIsSystemReady(true);
+            }
         };
 
-        initializeSystem();
-    }, []); 
+        if (editableLocations.length > 0) {
+            initializeSystem();
+        }
+    }, [editableLocations]); 
 
-    // Get waiting tickets
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'), orderBy('createdAt', 'asc'));
-        const unsubscribe = onSnapshot(q, 
-            (snapshot) => {
-                const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setWaitingTickets(tickets);
-            },
-            (error) => {
-                console.error("Fout bij ophalen van de wachtrij:", error);
-                if (error.message.includes("indexes?")) {
-                    alert(`DATABASE FOUT: De vereiste database-index voor de BEHEER-pagina ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
-                }
-            }
-        );
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setWaitingTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
         return () => unsubscribe();
     }, []);
 
-    // Get status of all locations
     useEffect(() => {
+        if (editableLocations.length === 0) return;
         const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
         const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
             const states = {};
@@ -333,7 +303,7 @@ function Admin() {
             setLocationStates(states);
         });
         return () => unsubscribe();
-    }, []);
+    }, [editableLocations]);
 
     const handleOpenTicketModal = (location) => {
         setSelectedLocation(location);
@@ -341,27 +311,19 @@ function Admin() {
     };
 
     const callSpecificTicket = async (location, ticket) => {
-        if (!location || !ticket || !ticket.id) {
-            alert("Interne fout: ongeldige selectie.");
-            return;
-        }
+        if (!location || !ticket || !ticket.id) { alert("Interne fout: ongeldige selectie."); return; }
         setIsProcessing(location);
         setIsTicketModalOpen(false);
 
         try {
             const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, ticket.id);
             const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
-
             await runTransaction(db, async (transaction) => {
                 const ticketDoc = await transaction.get(ticketRef);
-                if (!ticketDoc.exists() || ticketDoc.data().status !== 'waiting') {
-                    throw new Error("Ticket is al opgeroepen door een andere gebruiker.");
-                }
-
+                if (!ticketDoc.exists() || ticketDoc.data().status !== 'waiting') { throw new Error("Ticket is al opgeroepen door een andere gebruiker."); }
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
                 transaction.set(locationRef, { status: 'busy', ticketNumber: ticket.ticketNumber, ticketId: ticket.id });
             });
-
         } catch (e) {
             console.error("TRANSACTION FAILED: ", e);
             alert(`Fout bij oproepen: ${e.message}`);
@@ -372,10 +334,7 @@ function Admin() {
     };
 
     const putBackTicket = async (location) => {
-        if (!location || typeof location !== 'string') {
-            alert("Interne fout: ongeldige locatie.");
-            return;
-        }
+        if (!location || typeof location !== 'string') { alert("Interne fout: ongeldige locatie."); return; }
         setIsProcessing(location);
         const ticketId = locationStates[location]?.ticketId;
 
@@ -407,10 +366,7 @@ function Admin() {
     };
 
     const markAsFinished = async (location, comment) => {
-        if (!location || typeof location !== 'string') {
-            alert("Interne fout: ongeldige locatie.");
-            return;
-        }
+        if (!location || typeof location !== 'string') { alert("Interne fout: ongeldige locatie."); return; }
         setIsProcessing(location);
         setIsFinishModalOpen(false);
         const ticketId = locationStates[location]?.ticketId;
@@ -444,7 +400,7 @@ function Admin() {
             const ticketsSnapshot = await getDocs(ticketsRef);
             ticketsSnapshot.forEach(doc => batch.delete(doc.ref));
             
-            availableLocations.forEach(loc => {
+            editableLocations.forEach(loc => {
                 const locRef = doc(locationsRef, loc);
                 batch.set(locRef, { status: 'available', ticketNumber: null, ticketId: null });
             });
@@ -459,19 +415,26 @@ function Admin() {
         }
     };
 
+    const handleSaveLocations = async (newLocationNames) => {
+        const configRef = doc(db, `artifacts/${appId}/public/data/config`, 'locations');
+        try {
+            await setDoc(configRef, { names: newLocationNames });
+            setIsLocationModalOpen(false);
+        } catch (error) {
+            console.error("Error saving locations:", error);
+            alert("Kon de lokaalnamen niet opslaan.");
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
                 <div className="flex items-center space-x-4">
-                    <a href="https://wachtrijvv-kiosk.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
-                        <Ticket className="w-5 h-5 mr-2" />
-                        Kiosk
-                    </a>
-                    <a href="https://wachtrijvv-display.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
-                        <Monitor className="w-5 h-5 mr-2" />
-                        Display
-                    </a>
+                    <button onClick={() => setIsLocationModalOpen(true)} className="flex items-center bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                        <Edit className="w-5 h-5 mr-2" />
+                        Beheer Lokalen
+                    </button>
                     <a href="https://wachtrijvv-archive.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
                         <ArchiveIcon className="w-5 h-5 mr-2" />
                         Archief
@@ -505,7 +468,7 @@ function Admin() {
                          </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {availableLocations.map(loc => {
+                            {editableLocations.map(loc => {
                                 const state = locationStates[loc];
                                 const isBusy = state?.status === 'busy';
                                 const canCall = !isBusy && waitingTickets.length > 0;
@@ -558,6 +521,7 @@ function Admin() {
                 setComment={setFinishComment}
                 onConfirm={markAsFinished}
             />
+             <LocationEditModal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} locations={editableLocations} onSave={handleSaveLocations} />
             <ConfirmationModal
                 isOpen={isResetModalOpen}
                 onClose={() => setIsResetModalOpen(false)}
@@ -694,6 +658,57 @@ function FinishModal({ isOpen, onClose, onConfirm, location, comment, setComment
     );
 }
 
+// --- LocationEditModal Component ---
+function LocationEditModal({ isOpen, onClose, locations, onSave }) {
+    const [localLocations, setLocalLocations] = useState(locations);
+    
+    useEffect(() => {
+        setLocalLocations(locations);
+    }, [locations, isOpen]);
+
+    const handleNameChange = (index, newName) => {
+        const updatedLocations = [...localLocations];
+        updatedLocations[index] = newName;
+        setLocalLocations(updatedLocations);
+    };
+
+    const handleSave = () => {
+        onSave(localLocations);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full flex flex-col" style={{maxHeight: '90vh'}}>
+                <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h2 className="text-xl font-bold text-gray-900">Beheer Lokaalnamen</h2>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200">
+                        <X className="w-6 h-6 text-gray-600" />
+                    </button>
+                </div>
+                <div className="overflow-y-auto space-y-4">
+                    {localLocations.map((name, index) => (
+                        <div key={index}>
+                            <label className="block text-sm font-medium text-gray-700">Lokaal {index + 1}</label>
+                            <input 
+                                type="text"
+                                value={name}
+                                onChange={(e) => handleNameChange(index, e.target.value)}
+                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#d64e78] focus:border-[#d64e78]"
+                            />
+                        </div>
+                    ))}
+                </div>
+                <div className="flex justify-end space-x-4 mt-6 flex-shrink-0">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-semibold transition-colors">Annuleren</button>
+                    <button onClick={handleSave} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold transition-colors">Opslaan</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // --- ConfirmationModal Component ---
 function ConfirmationModal({ isOpen, onClose, onConfirm, title, message }) {
     if (!isOpen) return null;
@@ -742,3 +757,4 @@ document.head.appendChild(style);
 
 export default App;
 export { Kiosk, Display, Admin, Archive };
+
