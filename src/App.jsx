@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, runTransaction, query, where, orderBy, limit, serverTimestamp, getDocs, writeBatch, documentId, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2, Edit } from 'lucide-react';
+import { Users, Monitor, Ticket, Send, Building2, RefreshCw, CheckCircle2, Loader2, X, Archive as ArchiveIcon, Undo2, Volume2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 // This configuration is provided by the environment.
@@ -24,7 +24,7 @@ const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-wachtrij-app';
 const availableLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
 
-// --- Main App Component (for local development with navigation) ---
+// --- Main App Component ---
 function App() {
     useEffect(() => {
         document.title = 'Wachtrij Systeem';
@@ -62,7 +62,7 @@ function App() {
     );
 }
 
-// --- Kiosk Component (Single Page) ---
+// --- Kiosk Component (Home Page: /) ---
 function Kiosk() {
     const [ticketNumber, setTicketNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -131,11 +131,28 @@ function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
     const [flash, setFlash] = useState(false);
+    const [isAudioReady, setIsAudioReady] = useState(false);
+    const audioRef = useRef(null);
+    const lastPlayedId = useRef(null);
 
     useEffect(() => {
         document.title = 'Weergave | Wachtrij Systeem';
     }, []);
 
+    const initializeAudio = async () => {
+        if (audioRef.current && !isAudioReady) {
+            try {
+                await audioRef.current.play();
+                audioRef.current.pause(); 
+                setIsAudioReady(true);
+                console.log("Geluid geactiveerd.");
+            } catch (error) {
+                console.error("Audio activering mislukt:", error);
+                alert("Kon het geluid niet activeren. Klik nogmaals of controleer uw browserinstellingen.");
+            }
+        }
+    };
+    
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'called'), orderBy('calledAt', 'desc'), limit(1));
         
@@ -143,13 +160,15 @@ function Display() {
             if (!snapshot.empty) {
                 const newTicket = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
                 
-                setMostRecentTicket(currentTicket => {
-                    if (!currentTicket || currentTicket.id !== newTicket.id) {
-                        setFlash(true);
-                        return newTicket;
+                if (newTicket.id !== lastPlayedId.current) {
+                    setMostRecentTicket(newTicket);
+                    setFlash(true);
+                    lastPlayedId.current = newTicket.id;
+                    if (isAudioReady && audioRef.current) {
+                        audioRef.current.currentTime = 0;
+                        audioRef.current.play().catch(e => console.error("Fout bij afspelen geluid:", e));
                     }
-                    return currentTicket;
-                });
+                }
             } else {
                 setMostRecentTicket(null);
             }
@@ -162,7 +181,7 @@ function Display() {
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [isAudioReady]);
 
     useEffect(() => {
         if (flash) {
@@ -185,12 +204,24 @@ function Display() {
     }, []);
 
     return (
-        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+        <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full relative">
+             <audio ref={audioRef} src="https://methodeschoolvanveldeke.be/wp-content/uploads/2025/06/notificationwachtrij.mp3" preload="auto"></audio>
+            {!isAudioReady && (
+                <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                    <button 
+                        onClick={initializeAudio}
+                        className="bg-[#d64e78] text-white font-bold py-6 px-10 rounded-lg text-2xl flex items-center gap-3 animate-pulse"
+                    >
+                        <Volume2 size={32} />
+                        Klik hier om geluid te activeren
+                    </button>
+                </div>
+            )}
             <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl transition-all duration-300 ${flash ? 'animate-flash' : ''}`}>
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
-                        <p className="text-8xl md:text-9xl lg:text-[12rem] font-black my-4 text-white animate-fade-in">{mostRecentTicket.ticketNumber}</p>
+                        <p className="text-8xl md:text-9xl lg:text-[12rem] font-black my-4 text-white">{mostRecentTicket.ticketNumber}</p>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Ga naar</h2>
                         <p className="text-6xl md:text-7xl lg:text-[7rem] font-bold text-white mt-4">{mostRecentTicket.location}</p>
                     </>
@@ -230,31 +261,16 @@ function Display() {
 function Admin() {
     const [waitingTickets, setWaitingTickets] = useState([]);
     const [locationStates, setLocationStates] = useState({});
-    const [editableLocations, setEditableLocations] = useState([]);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(null);
     const [isSystemReady, setIsSystemReady] = useState(false);
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
     const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
-    const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [finishComment, setFinishComment] = useState("");
     const [selectedLocation, setSelectedLocation] = useState(null);
 
     useEffect(() => {
         document.title = 'Beheer | Wachtrij Systeem';
-
-        const configRef = doc(db, `artifacts/${appId}/public/data/config`, 'locations');
-        const unsubscribe = onSnapshot(configRef, async (docSnap) => {
-            if (docSnap.exists() && docSnap.data().names) {
-                setEditableLocations(docSnap.data().names);
-            } else {
-                const defaultLocations = Array.from({ length: 10 }, (_, i) => `Lokaal ${i + 1}`);
-                await setDoc(configRef, { names: defaultLocations });
-                setEditableLocations(defaultLocations);
-            }
-        });
-        
-        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -264,8 +280,7 @@ function Admin() {
             const batch = writeBatch(db);
             let writesMade = false;
 
-            for (const locationName of editableLocations) {
-                if (!locationName) continue;
+            for (const locationName of availableLocations) {
                 const locationDocRef = doc(locationsCollectionRef, locationName);
                 try {
                     const docSnap = await getDoc(locationDocRef);
@@ -282,27 +297,33 @@ function Admin() {
                 console.log("Initializing missing location documents...");
                 await batch.commit();
             }
-            if (editableLocations.length > 0) {
-                 console.log("System is ready.");
-                 setIsSystemReady(true);
-            }
+            console.log("System is ready.");
+            setIsSystemReady(true);
         };
 
-        if (editableLocations.length > 0) {
-            initializeSystem();
-        }
-    }, [editableLocations]); 
+        initializeSystem();
+    }, []); 
 
+    // Get waiting tickets
     useEffect(() => {
         const q = query(collection(db, `artifacts/${appId}/public/data/tickets`), where('status', '==', 'waiting'), orderBy('createdAt', 'asc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setWaitingTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
+        const unsubscribe = onSnapshot(q, 
+            (snapshot) => {
+                const tickets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setWaitingTickets(tickets);
+            },
+            (error) => {
+                console.error("Fout bij ophalen van de wachtrij:", error);
+                if (error.message.includes("indexes?")) {
+                    alert(`DATABASE FOUT: De vereiste database-index voor de BEHEER-pagina ontbreekt. Open de browser console (F12), zoek naar de foutmelding van Firebase, en klik op de link om de index aan te maken. Dit is een eenmalige actie.`);
+                }
+            }
+        );
         return () => unsubscribe();
     }, []);
 
+    // Get status of all locations
     useEffect(() => {
-        if (editableLocations.length === 0) return;
         const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
         const unsubscribe = onSnapshot(locationsRef, (snapshot) => {
             const states = {};
@@ -312,7 +333,7 @@ function Admin() {
             setLocationStates(states);
         });
         return () => unsubscribe();
-    }, [editableLocations]);
+    }, []);
 
     const handleOpenTicketModal = (location) => {
         setSelectedLocation(location);
@@ -320,19 +341,27 @@ function Admin() {
     };
 
     const callSpecificTicket = async (location, ticket) => {
-        if (!location || !ticket || !ticket.id) { alert("Interne fout: ongeldige selectie."); return; }
+        if (!location || !ticket || !ticket.id) {
+            alert("Interne fout: ongeldige selectie.");
+            return;
+        }
         setIsProcessing(location);
         setIsTicketModalOpen(false);
 
         try {
             const ticketRef = doc(db, `artifacts/${appId}/public/data/tickets`, ticket.id);
             const locationRef = doc(db, `artifacts/${appId}/public/data/locations`, location);
+
             await runTransaction(db, async (transaction) => {
                 const ticketDoc = await transaction.get(ticketRef);
-                if (!ticketDoc.exists() || ticketDoc.data().status !== 'waiting') { throw new Error("Ticket is al opgeroepen door een andere gebruiker."); }
+                if (!ticketDoc.exists() || ticketDoc.data().status !== 'waiting') {
+                    throw new Error("Ticket is al opgeroepen door een andere gebruiker.");
+                }
+
                 transaction.update(ticketRef, { status: 'called', location: location, calledAt: serverTimestamp() });
                 transaction.set(locationRef, { status: 'busy', ticketNumber: ticket.ticketNumber, ticketId: ticket.id });
             });
+
         } catch (e) {
             console.error("TRANSACTION FAILED: ", e);
             alert(`Fout bij oproepen: ${e.message}`);
@@ -343,7 +372,10 @@ function Admin() {
     };
 
     const putBackTicket = async (location) => {
-        if (!location || typeof location !== 'string') { alert("Interne fout: ongeldige locatie."); return; }
+        if (!location || typeof location !== 'string') {
+            alert("Interne fout: ongeldige locatie.");
+            return;
+        }
         setIsProcessing(location);
         const ticketId = locationStates[location]?.ticketId;
 
@@ -375,7 +407,10 @@ function Admin() {
     };
 
     const markAsFinished = async (location, comment) => {
-        if (!location || typeof location !== 'string') { alert("Interne fout: ongeldige locatie."); return; }
+        if (!location || typeof location !== 'string') {
+            alert("Interne fout: ongeldige locatie.");
+            return;
+        }
         setIsProcessing(location);
         setIsFinishModalOpen(false);
         const ticketId = locationStates[location]?.ticketId;
@@ -409,7 +444,7 @@ function Admin() {
             const ticketsSnapshot = await getDocs(ticketsRef);
             ticketsSnapshot.forEach(doc => batch.delete(doc.ref));
             
-            editableLocations.forEach(loc => {
+            availableLocations.forEach(loc => {
                 const locRef = doc(locationsRef, loc);
                 batch.set(locRef, { status: 'available', ticketNumber: null, ticketId: null });
             });
@@ -424,26 +459,19 @@ function Admin() {
         }
     };
 
-    const handleSaveLocations = async (newLocationNames) => {
-        const configRef = doc(db, `artifacts/${appId}/public/data/config`, 'locations');
-        try {
-            await setDoc(configRef, { names: newLocationNames });
-            setIsLocationModalOpen(false);
-        } catch (error) {
-            console.error("Error saving locations:", error);
-            alert("Kon de lokaalnamen niet opslaan.");
-        }
-    };
-
     return (
         <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
                 <div className="flex items-center space-x-4">
-                    <button onClick={() => setIsLocationModalOpen(true)} className="flex items-center bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
-                        <Edit className="w-5 h-5 mr-2" />
-                        Beheer Lokalen
-                    </button>
+                    <a href="https://wachtrijvv-kiosk.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                        <Ticket className="w-5 h-5 mr-2" />
+                        Kiosk
+                    </a>
+                    <a href="https://wachtrijvv-display.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                        <Monitor className="w-5 h-5 mr-2" />
+                        Display
+                    </a>
                     <a href="https://wachtrijvv-archive.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
                         <ArchiveIcon className="w-5 h-5 mr-2" />
                         Archief
@@ -477,7 +505,7 @@ function Admin() {
                          </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {editableLocations.map(loc => {
+                            {availableLocations.map(loc => {
                                 const state = locationStates[loc];
                                 const isBusy = state?.status === 'busy';
                                 const canCall = !isBusy && waitingTickets.length > 0;
@@ -530,7 +558,6 @@ function Admin() {
                 setComment={setFinishComment}
                 onConfirm={markAsFinished}
             />
-             <LocationEditModal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} locations={editableLocations} onSave={handleSaveLocations} />
             <ConfirmationModal
                 isOpen={isResetModalOpen}
                 onClose={() => setIsResetModalOpen(false)}
@@ -661,57 +688,6 @@ function FinishModal({ isOpen, onClose, onConfirm, location, comment, setComment
                 <div className="flex justify-end space-x-4">
                     <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-semibold transition-colors">Annuleren</button>
                     <button onClick={() => onConfirm(location, comment)} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold transition-colors">Bevestigen</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// --- LocationEditModal Component ---
-function LocationEditModal({ isOpen, onClose, locations, onSave }) {
-    const [localLocations, setLocalLocations] = useState(locations);
-    
-    useEffect(() => {
-        setLocalLocations(locations);
-    }, [locations, isOpen]);
-
-    const handleNameChange = (index, newName) => {
-        const updatedLocations = [...localLocations];
-        updatedLocations[index] = newName;
-        setLocalLocations(updatedLocations);
-    };
-
-    const handleSave = () => {
-        onSave(localLocations);
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full flex flex-col" style={{maxHeight: '90vh'}}>
-                <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                    <h2 className="text-xl font-bold text-gray-900">Beheer Lokaalnamen</h2>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200">
-                        <X className="w-6 h-6 text-gray-600" />
-                    </button>
-                </div>
-                <div className="overflow-y-auto space-y-4">
-                    {localLocations.map((name, index) => (
-                        <div key={index}>
-                            <label className="block text-sm font-medium text-gray-700">Lokaal {index + 1}</label>
-                            <input 
-                                type="text"
-                                value={name}
-                                onChange={(e) => handleNameChange(index, e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#d64e78] focus:border-[#d64e78]"
-                            />
-                        </div>
-                    ))}
-                </div>
-                <div className="flex justify-end space-x-4 mt-6 flex-shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 font-semibold transition-colors">Annuleren</button>
-                    <button onClick={handleSave} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold transition-colors">Opslaan</button>
                 </div>
             </div>
         </div>
