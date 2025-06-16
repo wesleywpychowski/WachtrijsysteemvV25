@@ -755,6 +755,4 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export default App;
-export { Kiosk, Display, Admin, Archive };
-
+export { App, Kiosk, Display, Admin, Archive };
