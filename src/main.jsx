@@ -21,7 +21,6 @@ const PageWrapper = ({ children }) => (
 
 
 // Bepaal welke pagina we moeten tonen op basis van de instelling in Netlify
-// De BrowserRouter is nu toegevoegd om de 'basename' fout op te lossen.
 switch (appMode) {
   case 'kiosk':
     ComponentToRender = <PageWrapper><Kiosk /></PageWrapper>;
