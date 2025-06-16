@@ -130,6 +130,7 @@ function Kiosk() {
 function Display() {
     const [mostRecentTicket, setMostRecentTicket] = useState(null);
     const [busyLocations, setBusyLocations] = useState([]);
+    const [flash, setFlash] = useState(false);
     const [isAudioReady, setIsAudioReady] = useState(false);
     const audioRef = useRef(null);
     const lastPlayedId = useRef(null);
@@ -182,6 +183,15 @@ function Display() {
     }, [isAudioReady]);
 
     useEffect(() => {
+        if (flash) {
+            const timer = setTimeout(() => {
+                setFlash(false);
+            }, 2000); 
+            return () => clearTimeout(timer);
+        }
+    }, [flash]);
+
+    useEffect(() => {
         const locationsRef = collection(db, `artifacts/${appId}/public/data/locations`);
         const q = query(locationsRef, where('status', '==', 'busy'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -194,7 +204,7 @@ function Display() {
 
     return (
         <div className="bg-gray-800 text-white p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 h-full relative">
-            <audio ref={audioRef} src="https://methodeschoolvanveldeke.be/wp-content/uploads/2025/06/notificationwachtrij.mp3" preload="auto"></audio>
+             <audio ref={audioRef} src="https://methodeschoolvanveldeke.be/wp-content/uploads/2025/06/notificationwachtrij.mp3" preload="auto"></audio>
             {!isAudioReady && (
                 <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
                     <button 
@@ -206,11 +216,11 @@ function Display() {
                     </button>
                 </div>
             )}
-            <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl`}>
+            <div className={`lg:col-span-2 bg-[#d64e78] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl transition-all duration-300 ${flash ? 'animate-flash' : ''}`}>
                 {mostRecentTicket ? (
                     <>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Volgnummer</h2>
-                        <p className="text-8xl md:text-9xl lg:text-[12rem] font-black my-4 text-white">{mostRecentTicket.ticketNumber}</p>
+                        <p className="text-8xl md:text-9xl lg:text-[12rem] font-black my-4 text-white animate-fade-in">{mostRecentTicket.ticketNumber}</p>
                         <h2 className="text-4xl md:text-5xl font-bold text-yellow-300 uppercase tracking-wider">Ga naar</h2>
                         <p className="text-6xl md:text-7xl lg:text-[7rem] font-bold text-white mt-4">{mostRecentTicket.location}</p>
                     </>
@@ -228,7 +238,7 @@ function Display() {
                     {busyLocations.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
                             {busyLocations.map(loc => (
-                                <div key={loc.name} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center">
+                                <div key={loc.name} className="bg-gray-600 p-4 rounded-lg flex flex-col text-center animate-slide-in">
                                     <span className="font-bold text-2xl text-yellow-400">{loc.name}</span>
                                     <span className="font-black text-4xl text-white mt-1"># {loc.ticketNumber}</span>
                                 </div>
@@ -453,9 +463,17 @@ function Admin() {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">Beheer Wachtrij</h1>
                 <div className="flex items-center space-x-4">
+                    <a href="https://wachtrijvv-kiosk.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                        <Ticket className="w-5 h-5 mr-2" />
+                        Kiosk
+                    </a>
+                    <a href="https://wachtrijvv-display.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
+                        <Monitor className="w-5 h-5 mr-2" />
+                        Display
+                    </a>
                     <a href="https://wachtrijvv-archive.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-colors">
                         <ArchiveIcon className="w-5 h-5 mr-2" />
-                        Bekijk Archief
+                        Archief
                     </a>
                     <button onClick={() => setIsResetModalOpen(true)} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors">
                         <RefreshCw className="w-5 h-5 mr-2" />
@@ -721,5 +739,4 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-export default App;
-export { Kiosk, Display, Admin, Archive };
+export { App as default, Kiosk, Display, Admin, Archive };
